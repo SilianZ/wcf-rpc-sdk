@@ -208,6 +208,11 @@ message BoolResponse {
   bool status = 1;
 }
 
+// 获取消息请求
+message GetMsgRequest {
+  bool block = 1; // 是否阻塞，默认为 true
+}
+
 // WeChatFerry RPC 服务
 service WeChatFerryRPC {
   // 是否已登录
@@ -323,4 +328,7 @@ service WeChatFerryRPC {
 
   // 是否已启动接收消息功能
   rpc IsReceivingMsg (Empty) returns (BoolResponse) {}
+
+  // 获取消息
+  rpc GetMsg (GetMsgRequest) returns (WxMsg) {}
 } 

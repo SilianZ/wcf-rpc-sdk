@@ -57,6 +57,7 @@ const (
 	WeChatFerryRPC_GetQrcode_FullMethodName          = "/wechat_rpc.WeChatFerryRPC/GetQrcode"
 	WeChatFerryRPC_GetTables_FullMethodName          = "/wechat_rpc.WeChatFerryRPC/GetTables"
 	WeChatFerryRPC_IsReceivingMsg_FullMethodName     = "/wechat_rpc.WeChatFerryRPC/IsReceivingMsg"
+	WeChatFerryRPC_GetMsg_FullMethodName             = "/wechat_rpc.WeChatFerryRPC/GetMsg"
 )
 
 // WeChatFerryRPCClient is the client API for WeChatFerryRPC service.
@@ -141,6 +142,8 @@ type WeChatFerryRPCClient interface {
 	GetTables(ctx context.Context, in *DbQuery, opts ...grpc.CallOption) (*DbTables, error)
 	// 是否已启动接收消息功能
 	IsReceivingMsg(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BoolResponse, error)
+	// 获取消息
+	GetMsg(ctx context.Context, in *GetMsgRequest, opts ...grpc.CallOption) (*WxMsg, error)
 }
 
 type weChatFerryRPCClient struct {
@@ -558,6 +561,16 @@ func (c *weChatFerryRPCClient) IsReceivingMsg(ctx context.Context, in *Empty, op
 	return out, nil
 }
 
+func (c *weChatFerryRPCClient) GetMsg(ctx context.Context, in *GetMsgRequest, opts ...grpc.CallOption) (*WxMsg, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WxMsg)
+	err := c.cc.Invoke(ctx, WeChatFerryRPC_GetMsg_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WeChatFerryRPCServer is the server API for WeChatFerryRPC service.
 // All implementations must embed UnimplementedWeChatFerryRPCServer
 // for forward compatibility.
@@ -640,6 +653,8 @@ type WeChatFerryRPCServer interface {
 	GetTables(context.Context, *DbQuery) (*DbTables, error)
 	// 是否已启动接收消息功能
 	IsReceivingMsg(context.Context, *Empty) (*BoolResponse, error)
+	// 获取消息
+	GetMsg(context.Context, *GetMsgRequest) (*WxMsg, error)
 	mustEmbedUnimplementedWeChatFerryRPCServer()
 }
 
@@ -763,6 +778,9 @@ func (UnimplementedWeChatFerryRPCServer) GetTables(context.Context, *DbQuery) (*
 }
 func (UnimplementedWeChatFerryRPCServer) IsReceivingMsg(context.Context, *Empty) (*BoolResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsReceivingMsg not implemented")
+}
+func (UnimplementedWeChatFerryRPCServer) GetMsg(context.Context, *GetMsgRequest) (*WxMsg, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMsg not implemented")
 }
 func (UnimplementedWeChatFerryRPCServer) mustEmbedUnimplementedWeChatFerryRPCServer() {}
 func (UnimplementedWeChatFerryRPCServer) testEmbeddedByValue()                        {}
@@ -1448,6 +1466,24 @@ func _WeChatFerryRPC_IsReceivingMsg_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WeChatFerryRPC_GetMsg_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMsgRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WeChatFerryRPCServer).GetMsg(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WeChatFerryRPC_GetMsg_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WeChatFerryRPCServer).GetMsg(ctx, req.(*GetMsgRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WeChatFerryRPC_ServiceDesc is the grpc.ServiceDesc for WeChatFerryRPC service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1594,6 +1630,10 @@ var WeChatFerryRPC_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IsReceivingMsg",
 			Handler:    _WeChatFerryRPC_IsReceivingMsg_Handler,
+		},
+		{
+			MethodName: "GetMsg",
+			Handler:    _WeChatFerryRPC_GetMsg_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
