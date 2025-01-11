@@ -1,0 +1,326 @@
+syntax = "proto3";
+
+package wechat_rpc;
+
+option go_package = ".;wechat_rpc";
+
+// 消息类型
+enum MsgType {
+  MT_UNKNOWN = 0;
+  MT_TEXT = 1;       // 文本消息
+  MT_IMAGE = 3;      // 图片消息
+  MT_VOICE = 34;     // 语音消息
+  MT_EMOTION = 47;   // 表情消息
+  MT_LINK = 49;      // 链接消息
+  MT_FILE = 1000;    // 文件消息
+  MT_SYS = 10000;    // 系统消息
+  MT_RECALLED = 10002; // 撤回消息
+}
+
+// 微信消息结构
+message WxMsg {
+  MsgType type = 1;    // 消息类型
+  string id = 2;       // 消息 id
+  string xml = 3;      // 消息 xml 部分
+  string sender = 4;   // 消息发送人
+  string roomid = 5;   // 群 id (仅群消息有)
+  string content = 6;  // 消息内容
+  string thumb = 7;    // 视频或图片消息的缩略图路径
+  string extra = 8;    // 视频或图片消息的路径
+  int64 ts = 9;        // 消息时间戳
+  string sign = 10;    // 消息签名
+}
+
+// 联系人信息
+message RpcContact {
+  string wxid = 1;
+  string code = 2;
+  string name = 3;
+  int32 gender = 4;
+}
+
+// 空消息
+message Empty {}
+
+// 数据库名称列表
+message DbNames {
+  repeated string names = 1;
+}
+
+// 数据库表信息
+message DbTable {
+  string name = 1;
+  string sql = 2;
+}
+
+// 数据库表信息列表
+message DbTables {
+  repeated DbTable tables = 1;
+}
+
+// 数据库字段
+message DbField {
+  string field = 1;
+  bytes value = 2;
+}
+
+// 数据库查询结果行
+message DbRow {
+  repeated DbField fields = 1;
+}
+
+// 数据库查询结果集
+message DbRows {
+  repeated DbRow rows = 1;
+}
+
+// 数据库查询请求
+message DbQuery {
+  string db = 1;
+  string sql = 2;
+}
+
+// 路径消息
+message PathMsg {
+  string path = 1;
+}
+
+// 文本消息
+message TextMsg {
+  string msg = 1;
+  string receiver = 2;
+  string aters = 3;
+}
+
+// XML 消息
+message XmlMsg {
+  string receiver = 1;
+  string xml = 2;
+  int32 type = 3;
+  string path = 4;
+}
+
+// 富文本消息
+message RichText {
+  string name = 1;
+  string account = 2;
+  string title = 3;
+  string digest = 4;
+  string url = 5;
+  string thumburl = 6;
+  string receiver = 7;
+}
+
+// 拍一拍消息
+message PatMsg {
+  string roomid = 1;
+  string wxid = 2;
+}
+
+// 转发消息请求
+message ForwardMsgRequest {
+  int64 id = 1;
+  string receiver = 2;
+}
+
+// 解密路径
+message DecPath {
+  string src = 1;
+  string dir = 2;
+}
+
+// OCR 识别请求
+message OcrMsg {
+  string extra = 1;
+  int32 timeout = 2;
+}
+
+// 群成员管理
+message MemberMgmt {
+  string roomid = 1;
+  string wxids = 2;
+}
+
+// 好友验证消息
+message Verification {
+  string v3 = 1;
+  string v4 = 2;
+  int32 scene = 3;
+}
+
+// 转账消息
+message Transfer {
+  string wxid = 1;
+  string transferid = 2;
+  string transactionid = 3;
+}
+
+// 刷新朋友圈请求
+message RefreshPyqRequest {
+  int64 id = 1;
+}
+
+// 下载附件请求
+message DownloadAttachRequest {
+  int64 id = 1;
+  string thumb = 2;
+  string extra = 3;
+}
+
+// 下载图片
+message DownloadImage {
+  int64 id = 1;
+  string extra = 2;
+  string dir = 3;
+  int32 timeout = 4;
+}
+
+// 获取语音消息请求
+message GetAudioMsgRequest {
+  int64 id = 1;
+  string dir = 2;
+  int32 timeout = 3;
+}
+
+// 获取群名片请求
+message GetAliasInChatRoomRequest {
+  string wxid = 1;
+  string roomid = 2;
+}
+
+// 群成员
+message ChatRoomMembers {
+  map<string, string> members = 1;
+}
+
+// 字符串响应
+message StringResponse {
+  string result = 1;
+}
+
+// 整数响应
+message IntResponse {
+  int32 status = 1;
+}
+
+// 布尔响应
+message BoolResponse {
+  bool status = 1;
+}
+
+// WeChatFerry RPC 服务
+service WeChatFerryRPC {
+  // 是否已登录
+  rpc IsLogin (Empty) returns (BoolResponse) {}
+
+  // 获取登录账户的 wxid
+  rpc GetSelfWxid (Empty) returns (StringResponse) {}
+
+  // 获取所有消息类型
+  rpc GetMsgTypes (Empty) returns (stream WxMsg) {}
+
+  // 获取完整通讯录
+  rpc GetContacts (Empty) returns (stream RpcContact) {}
+
+  // 获取所有数据库名称
+  rpc GetDbNames (Empty) returns (DbNames) {}
+
+  // 获取指定数据库的所有表
+  rpc GetDbTables (DbQuery) returns (DbTables) {}
+
+  // 获取登录账号个人信息
+  rpc GetUserInfo (Empty) returns (RpcContact) {}
+
+  // 获取语音消息并转成 MP3
+  rpc GetAudioMsg (GetAudioMsgRequest) returns (StringResponse) {}
+
+  // 发送文本消息
+  rpc SendText (TextMsg) returns (IntResponse) {}
+
+  // 发送图片
+  rpc SendImage (PathMsg) returns (IntResponse) {}
+
+  // 发送文件
+  rpc SendFile (PathMsg) returns (IntResponse) {}
+
+  // 发送 XML
+  rpc SendXml (XmlMsg) returns (IntResponse) {}
+
+  // 发送表情
+  rpc SendEmotion (PathMsg) returns (IntResponse) {}
+
+  // 发送富文本消息
+  rpc SendRichText (RichText) returns (IntResponse) {}
+
+  // 发送拍一拍消息
+  rpc SendPatMsg (PatMsg) returns (IntResponse) {}
+
+  // 转发消息
+  rpc ForwardMsg (ForwardMsgRequest) returns (IntResponse) {}
+
+  // 启用接收消息
+  rpc EnableRecvMsg (Empty) returns (BoolResponse) {}
+
+  // 禁用接收消息
+  rpc DisableRecvMsg (Empty) returns (IntResponse) {}
+
+  // 执行 SQL 查询
+  rpc ExecDbQuery (DbQuery) returns (DbRows) {}
+
+  // 通过好友申请
+  rpc AcceptFriend (Verification) returns (IntResponse) {}
+
+  // 接收转账
+  rpc ReceiveTransfer (Transfer) returns (IntResponse) {}
+
+  // 刷新朋友圈
+  rpc RefreshPyq (RefreshPyqRequest) returns (IntResponse) {}
+
+  // 下载附件
+  rpc DownloadAttach (DownloadAttachRequest) returns (IntResponse) {}
+
+  // 通过 wxid 获取联系人信息
+  rpc GetInfoByWxid (StringResponse) returns (RpcContact) {}
+
+  // 撤回消息
+  rpc RevokeMsg (IntResponse) returns (IntResponse) {}
+
+  // 刷新二维码
+  rpc RefreshQrcode (Empty) returns (StringResponse) {}
+
+  // 解密图片
+  rpc DecryptImage (DecPath) returns (StringResponse) {}
+
+  // 执行 OCR 识别
+  rpc ExecOcr (OcrMsg) returns (StringResponse) {}
+
+  // 添加群成员
+  rpc AddRoomMembers (MemberMgmt) returns (IntResponse) {}
+
+  // 删除群成员
+  rpc DelRoomMembers (MemberMgmt) returns (IntResponse) {}
+
+  // 邀请群成员
+  rpc InvRoomMembers (MemberMgmt) returns (IntResponse) {}
+
+  // 获取群名片
+  rpc GetAliasInChatRoom (GetAliasInChatRoomRequest) returns (StringResponse) {}
+
+  // 获取群成员
+  rpc GetChatRoomMembers (StringResponse) returns (ChatRoomMembers) {}
+
+  // 获取好友列表
+  rpc GetFriends (Empty) returns (stream RpcContact) {}
+
+  // 获取 OCR 结果
+  rpc GetOcrResult (OcrMsg) returns (StringResponse) {}
+
+  // 获取登录二维码
+  rpc GetQrcode (Empty) returns (StringResponse) {}
+
+  // 获取 db 中所有表
+  rpc GetTables (DbQuery) returns (DbTables) {}
+
+  // 是否已启动接收消息功能
+  rpc IsReceivingMsg (Empty) returns (BoolResponse) {}
+} 

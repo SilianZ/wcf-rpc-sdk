@@ -1,0 +1,18 @@
+version: '3.5'
+
+services:
+  desktop:
+    image: dannicool/wechatbot-provider-windows:wc-3935
+    container_name: DESKTOP
+    ports:
+      - "13389:3389"
+      - "10086:10086"  # RPC 推消息端口
+      - "10087:10087"  # RPC 收消息端口
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
+    volumes:
+      - ./wechat/program:/root/.wine/drive_c/Program Files/Tencent/WeChat  # 程序文件挂载
+      - ./wechat/user_dat:/root/.wine/drive_c/users/root/AppData/Roaming/Tencent/WeChat  # 用户数据挂载
+    restart: unless-stopped # 可选，根据需要配置重启策略
