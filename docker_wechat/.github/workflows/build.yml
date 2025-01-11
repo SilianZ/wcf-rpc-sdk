@@ -48,7 +48,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/docker_wechat:${{ env.VERSION }}
             ${{ secrets.DOCKER_USERNAME }}/docker_wechat:latest
-          file: ./docker/Dockerfile
+          file: ./Dockerfile
           context: .
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
