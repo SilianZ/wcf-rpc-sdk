@@ -1,8 +1,7 @@
 [Desktop Entry]
 Name=WeChatFerry
 Type=Application
-Exec=/bin/bash /root/res/launch.sh
-# Exec=lxterminal --command "/bin/bash /root/res/launch.sh"
+Exec=/root/res/entrypoint.sh
 StartupNotify=true
 Path=/root/res
 Icon=E282_WeChat.0

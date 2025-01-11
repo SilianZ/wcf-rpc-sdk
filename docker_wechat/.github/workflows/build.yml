@@ -52,7 +52,4 @@ jobs:
           context: .
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
-          builder: ${{ steps.buildx.outputs.name }}
-          build-args: |
-            WECHAT_URL=${{ secrets.WECHAT_URL }}
-            SDK_URL=${{ secrets.SDK_URL }} 
+          builder: ${{ steps.buildx.outputs.name }} 

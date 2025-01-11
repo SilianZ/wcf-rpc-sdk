@@ -8,5 +8,9 @@ rm /var/run/xrdp-sesman.pid
 /usr/sbin/xrdp
 /usr/sbin/xrdp-sesman
 
+# 启动注入器
+echo "Starting injector..."
+wine /root/injector.exe ${INJECTOR_PORT} ${INJECTOR_DEBUG} &
+
 # Necesssary for docker
 exec "$@"
