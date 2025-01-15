@@ -1,7 +1,8 @@
-.idea
+# 忽略所有名为 .idea 的文件夹，无论它们位于哪个目录层级
+**/.idea/
 
 outside
 
 wechat
 
-docker_wechat
+**/docker_wechat
