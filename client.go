@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
+	"strconv"
+	"strings"
 	"wcf-rpc-sdk/internal/manager"
 	"wcf-rpc-sdk/internal/wcf"
 	"wcf-rpc-sdk/logging"
@@ -30,6 +32,7 @@ type Client struct {
 	msgBuffer    *MessageBuffer
 	cacheManager *manager.CacheManager
 	wxClient     *wcf.Client
+	addr         string // 接口地址
 }
 
 // Close 停止客户端
@@ -103,18 +106,26 @@ func NewClient(msgChanSize int) *Client {
 		stop:      cancel,
 		msgBuffer: NewMessageBuffer(msgChanSize), // 消息缓冲区 <缓冲大小>
 		wxClient:  wxclient,
+		addr:      addr,
 	}
 }
 
-// Run 运行tcp监听 以及 请求tcp监听信息
-func (c *Client) Run(debug bool) {
+// Run 运行tcp监听 以及 请求tcp监听信息 <是否debug> <是否自动注入微信（自动打开微信）>
+func (c *Client) Run(debug bool, autoInject bool) {
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		logging.Debug("Debug mode enabled")
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
-	// todo 调用注入程序 或者单独分一个方法
+	if autoInject {
+		port, err := strconv.Atoi(c.addr[strings.LastIndex(c.addr, ":")+1:])
+		if err != nil {
+			logging.ErrorWithErr(err, "the port is invalid, please check your address")
+			logging.Fatal("canot auto inject!", 1000, map[string]interface{}{"port": port})
+		}
+		Inject(port, debug) // 调用sdk.dll 注入&启动微信
+	}
 
 	go func() { // 处理接收消息
 		err := c.handleMsg(c.ctx)
