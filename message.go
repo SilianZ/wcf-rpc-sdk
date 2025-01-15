@@ -80,24 +80,24 @@ func (mb *MessageBuffer) Get(ctx context.Context) (*Message, error) {
 
 // UserInfo 用户信息（当前用户信息）
 type UserInfo struct {
-	Wxid   string `protobuf:"bytes,1,opt,name=wxid,proto3" json:"wxid,omitempty"`
-	Name   string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Mobile string `protobuf:"bytes,3,opt,name=mobile,proto3" json:"mobile,omitempty"`
-	Home   string `protobuf:"bytes,4,opt,name=home,proto3" json:"home,omitempty"`
+	Wxid   string `json:"wxid,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Mobile string `json:"mobile,omitempty"`
+	Home   string `json:"home,omitempty"`
 }
 
 // Contacts 联系人
 type Contacts []*Contact
 
 type Contact struct {
-	Wxid     string `protobuf:"bytes,1,opt,name=wxid,proto3" json:"wxid,omitempty"`
-	Code     string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	Remark   string `protobuf:"bytes,3,opt,name=remark,proto3" json:"remark,omitempty"`
-	Name     string `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	Country  string `protobuf:"bytes,5,opt,name=country,proto3" json:"country,omitempty"`
-	Province string `protobuf:"bytes,6,opt,name=province,proto3" json:"province,omitempty"`
-	City     string `protobuf:"bytes,7,opt,name=city,proto3" json:"city,omitempty"`
-	Gender   int32  `protobuf:"varint,8,opt,name=gender,proto3" json:"gender,omitempty"`
+	Wxid     string `json:"wxid,omitempty"`
+	Code     string `json:"code,omitempty"`
+	Remark   string `json:"remark,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Country  string `json:"country,omitempty"`
+	Province string `json:"province,omitempty"`
+	City     string `json:"city,omitempty"`
+	Gender   int32  `json:"gender,omitempty"`
 }
 
 type MsgType int
