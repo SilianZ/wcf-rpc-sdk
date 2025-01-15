@@ -1,6 +1,8 @@
 package wcf
 
 import (
+	"context"
+	"fmt"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol"
 	"go.nanomsg.org/mangos/v3/protocol/pair1"
@@ -549,8 +551,10 @@ func (c *Client) DisableRecvTxt() int32 {
 	return recv.GetStatus()
 }
 
+type MsgHandler func(msg *WxMsg) error
+
 // OnMSG 接收消息
-func (c *Client) OnMSG(f func(msg *WxMsg)) error {
+func (c *Client) OnMSG(ctx context.Context, f MsgHandler) error {
 	socket, err := pair1.NewSocket()
 	if err != nil {
 		return err
@@ -563,13 +567,24 @@ func (c *Client) OnMSG(f func(msg *WxMsg)) error {
 	}
 	defer socket.Close()
 	for c.RecvTxt {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			// pass
+		}
 		msg := &Response{}
 		recv, err := socket.Recv()
 		if err != nil {
 			return err
 		}
 		_ = proto.Unmarshal(recv, msg)
-		go f(msg.GetWxmsg())
+		go func() {
+			err := f(msg.GetWxmsg())
+			if err != nil {
+				err = fmt.Errorf("onMsg err: %w", err)
+			}
+		}()
 
 	}
 	return err

@@ -187,6 +187,9 @@ func getFileExtension(fileName string) string {
 
 // addToCache adds a fileName to the cache.
 func (cm *CacheManager) addToCache(fileName string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	if cm.cache.Len() >= cm.capacity {
 		// Remove the least recently used element
 		back := cm.cache.Back()
@@ -220,4 +223,23 @@ func (cm *CacheManager) moveToFront(fileName string) {
 			return
 		}
 	}
+}
+
+// Close cleans up the cache files and releases resources.
+func (cm *CacheManager) Close() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	// Iterate through all cached files and remove them
+	for fileName, fileInfo := range cm.fileName2FileInfo {
+		if err := os.Remove(fileInfo.FilePath); err != nil {
+			logging.Error(fmt.Sprintf("failed to remove file: %s, error: %v\n", fileInfo.FilePath, err))
+		}
+		delete(cm.fileName2FileInfo, fileName)
+	}
+
+	// Clear the cache list
+	cm.cache.Init()
+
+	logging.Info("清除缓存并删除临时文件成功")
 }

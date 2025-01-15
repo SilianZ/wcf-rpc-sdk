@@ -1,6 +1,7 @@
 package wcf
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -180,9 +181,11 @@ func TestClient_OnMSG(t *testing.T) {
 
 	msgChan := make(chan *WxMsg)
 	go func() {
-		err := c.OnMSG(func(msg *WxMsg) {
+		var msgHandler MsgHandler = func(msg *WxMsg) error {
 			msgChan <- msg
-		})
+			return nil
+		}
+		err := c.OnMSG(context.Background(), msgHandler)
 		if err != nil {
 			t.Errorf("OnMSG() error = %v", err)
 		}

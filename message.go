@@ -4,7 +4,17 @@
 // @Desc
 package wcf_rpc_sdk
 
-import "wcf-rpc-sdk/internal/manager"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"wcf-rpc-sdk/internal/manager"
+	"wcf-rpc-sdk/logging"
+)
+
+var (
+	ErrBufferFull = errors.New("the message buffer is full")
+)
 
 type Message struct {
 	IsSelf    bool              `json:"is_self,omitempty"`
@@ -20,4 +30,144 @@ type Message struct {
 	Extra     string            `json:"extra,omitempty"`
 	Xml       string            `json:"xml,omitempty"`
 	FileInfo  *manager.FileInfo `json:"-"` // 图片保存信息
+
+	UserInfo *UserInfo `json:"user_info,omitempty"`
+	Contacts *Contacts `json:"contact,omitempty"`
+}
+
+type MessageBuffer struct {
+	msgCH chan *Message // 原始消息输入通道
+}
+
+// NewMessageBuffer 创建消息缓冲区 <缓冲大小>
+func NewMessageBuffer(bufferSize int) *MessageBuffer {
+	mb := &MessageBuffer{
+		msgCH: make(chan *Message, bufferSize),
+	}
+	return mb
+}
+
+// Put 向缓冲区中添加消息
+func (mb *MessageBuffer) Put(ctx context.Context, msg *Message) error {
+	retries := 3
+	for i := 0; i < retries; i++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case mb.msgCH <- msg:
+			logging.Info("put message to buffer")
+			return nil
+		default:
+			logging.Warn("message buffer is full, retrying", map[string]interface{}{fmt.Sprintf("%d", i+1): retries})
+		}
+
+		//// Optional: add a small delay before retrying to prevent busy-waiting
+		//time.Sleep(time.Millisecond * 100)
+	}
+	return ErrBufferFull
+}
+
+// Get 获取消息（阻塞等待）
+func (mb *MessageBuffer) Get(ctx context.Context) (*Message, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case msg := <-mb.msgCH:
+		logging.Info("retrieved message pair from buffer")
+		return msg, nil
+	}
+}
+
+// UserInfo 用户信息（当前用户信息）
+type UserInfo struct {
+	Wxid   string `protobuf:"bytes,1,opt,name=wxid,proto3" json:"wxid,omitempty"`
+	Name   string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Mobile string `protobuf:"bytes,3,opt,name=mobile,proto3" json:"mobile,omitempty"`
+	Home   string `protobuf:"bytes,4,opt,name=home,proto3" json:"home,omitempty"`
+}
+
+// Contacts 联系人
+type Contacts []*Contact
+
+type Contact struct {
+	Wxid     string `protobuf:"bytes,1,opt,name=wxid,proto3" json:"wxid,omitempty"`
+	Code     string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Remark   string `protobuf:"bytes,3,opt,name=remark,proto3" json:"remark,omitempty"`
+	Name     string `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Country  string `protobuf:"bytes,5,opt,name=country,proto3" json:"country,omitempty"`
+	Province string `protobuf:"bytes,6,opt,name=province,proto3" json:"province,omitempty"`
+	City     string `protobuf:"bytes,7,opt,name=city,proto3" json:"city,omitempty"`
+	Gender   int32  `protobuf:"varint,8,opt,name=gender,proto3" json:"gender,omitempty"`
+}
+
+type MsgType int
+
+const (
+	MsgTypeMoments           MsgType = iota // 朋友圈消息
+	MsgTypeText                             // 文字
+	MsgTypeImage                            // 图片
+	MsgTypeVoice                            // 语音
+	MsgTypeFriendConfirm                    // 好友确认
+	MsgTypePossibleFriend                   // POSSIBLEFRIEND_MSG
+	MsgTypeBusinessCard                     // 名片
+	MsgTypeVideo                            // 视频
+	MsgTypeRockPaperScissors                // 石头剪刀布 | 表情图片
+	MsgTypeLocation                         // 位置
+	MsgTypeShare                            // 共享实时位置、文件、转账、链接
+	MsgTypeVoip                             // VOIPMSG
+	MsgTypeWechatInit                       // 微信初始化
+	MsgTypeVoipNotify                       // VOIPNOTIFY
+	MsgTypeVoipInvite                       // VOIPINVITE
+	MsgTypeShortVideo                       // 小视频
+	MsgTypeRedPacket                        // 微信红包
+	MsgTypeSysNotice                        // SYSNOTICE
+	MsgTypeSystem                           // 红包、系统消息
+	MsgTypeRevoke                           // 撤回消息
+	MsgTypeSogouEmoji                       // 搜狗表情
+	MsgTypeLink                             // 链接
+	MsgTypeWechatRedPacket                  // 微信红包
+	MsgTypeRedPacketCover                   // 红包封面
+	MsgTypeVideoChannelVideo                // 视频号视频
+	MsgTypeVideoChannelCard                 // 视频号名片
+	MsgTypeQuote                            // 引用消息
+	MsgTypePat                              // 拍一拍
+	MsgTypeVideoChannelLive                 // 视频号直播
+	MsgTypeProductLink                      // 商品链接
+	MsgTypeMusicLink                        // 音乐链接
+	MsgTypeFile                             // 文件
+)
+
+var MsgTypeNames = map[MsgType]string{
+	MsgTypeMoments:           "朋友圈消息",
+	MsgTypeText:              "文字",
+	MsgTypeImage:             "图片",
+	MsgTypeVoice:             "语音",
+	MsgTypeFriendConfirm:     "好友确认",
+	MsgTypePossibleFriend:    "POSSIBLEFRIEND_MSG",
+	MsgTypeBusinessCard:      "名片",
+	MsgTypeVideo:             "视频",
+	MsgTypeRockPaperScissors: "石头剪刀布 | 表情图片",
+	MsgTypeLocation:          "位置",
+	MsgTypeShare:             "共享实时位置、文件、转账、链接",
+	MsgTypeVoip:              "VOIPMSG",
+	MsgTypeWechatInit:        "微信初始化",
+	MsgTypeVoipNotify:        "VOIPNOTIFY",
+	MsgTypeVoipInvite:        "VOIPINVITE",
+	MsgTypeShortVideo:        "小视频",
+	MsgTypeRedPacket:         "微信红包",
+	MsgTypeSysNotice:         "SYSNOTICE",
+	MsgTypeSystem:            "红包、系统消息",
+	MsgTypeRevoke:            "撤回消息",
+	MsgTypeSogouEmoji:        "搜狗表情",
+	MsgTypeLink:              "链接",
+	MsgTypeWechatRedPacket:   "微信红包",
+	MsgTypeRedPacketCover:    "红包封面",
+	MsgTypeVideoChannelVideo: "视频号视频",
+	MsgTypeVideoChannelCard:  "视频号名片",
+	MsgTypeQuote:             "引用消息",
+	MsgTypePat:               "拍一拍",
+	MsgTypeVideoChannelLive:  "视频号直播",
+	MsgTypeProductLink:       "商品链接",
+	MsgTypeMusicLink:         "音乐链接",
+	MsgTypeFile:              "文件",
 }
