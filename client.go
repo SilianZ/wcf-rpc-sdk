@@ -50,17 +50,23 @@ func (c *Client) Close() {
 	}
 }
 
-// GetMsg 获取消息
+// GetMsg 获取消息 !!!不推荐使用!!!
+// Deprecated
 func (c *Client) GetMsg() (*Message, error) {
 	if !c.wxClient.IsLogin() {
 		logging.Warn("客户端并未登录成功，请稍重试")
 		return nil, ErrNotLogin
 	}
-	msgPair, err := c.msgBuffer.Get(c.ctx)
+	msg, err := c.msgBuffer.Get(c.ctx)
 	if err != nil {
 		return nil, err
 	}
-	return msgPair, nil
+	return msg, nil
+}
+
+// GetMsgChan 返回消息的管道
+func (c *Client) GetMsgChan() <-chan *Message {
+	return c.msgBuffer.msgCH
 }
 
 func (c *Client) handleMsg(ctx context.Context) (err error) {
