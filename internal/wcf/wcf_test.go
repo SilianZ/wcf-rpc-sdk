@@ -123,7 +123,12 @@ func TestClient_SendTxt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWCF() error = %v", err)
 	}
-	defer c.Close()
+	defer func(c *Client) {
+		err := c.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}(c)
 
 	wxid := c.GetSelfWXID()
 	if wxid == "" {

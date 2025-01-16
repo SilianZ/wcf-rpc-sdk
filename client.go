@@ -38,7 +38,9 @@ type Client struct {
 // Close 停止客户端
 func (c *Client) Close() {
 	c.stop()
-	c.cacheManager.Close() // 清除缓存文件
+	if c.cacheManager != nil {
+		c.cacheManager.Close() // 清除缓存文件
+	}
 	err := c.wxClient.Close()
 	if err != nil {
 		logging.ErrorWithErr(err, "停止wcf客户端发生了错误")
@@ -68,6 +70,7 @@ func (c *Client) handleMsg(ctx context.Context) (err error) {
 		return nil
 	}
 	go func() {
+		c.wxClient.EnableRecvTxt()           // 允许接收消息
 		err = c.wxClient.OnMSG(ctx, handler) // 当消息到来时，处理消息
 		if err != nil {
 			logging.ErrorWithErr(err, "handlerMsg err")
@@ -138,4 +141,18 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	}()
 }
 
+// SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>
+func (c *Client) SendText(receiver string, content string, ats ...string) error {
+	res := c.wxClient.SendTxt(content, receiver, ats)
+	if res != 0 {
+		logging.Debug("wxCliend.SendTxt", map[string]interface{}{"res": res, "receiver": receiver, "content": content, "ats": ats})
+		return fmt.Errorf("wxClient.SendTxt err, code: %d", res)
+	}
+	return nil
+}
+
 // todo 图片解码模块
+
+// todo 发送图片
+
+// todo 对应消息的回复 message.Reply(xx)

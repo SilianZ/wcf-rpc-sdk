@@ -24,15 +24,15 @@ func log(args ...interface{}) {
 	fmt.Println("\033[1;7;32m[Inj]\033[0m", time.Now().Format("20060102_150405"), args)
 }
 
-/** 初始化. 加载动态库 */
-func init() {
-	log("Load dll:", libSdk)
-	var err error
-	gblDll, err = syscall.LoadDLL(libSdk)
-	if err != nil {
-		panic(err)
-	}
-}
+///** 初始化. 加载动态库 */
+//func init() {
+//	log("Load dll:", libSdk)
+//	var err error
+//	gblDll, err = syscall.LoadDLL(libSdk)
+//	if err != nil {
+//		panic(err)
+//	}
+//}
 
 /** 调用库接口 */
 func callFunc(funName string, title string, debug bool, port int) {
@@ -70,6 +70,15 @@ func waitingSignal(ctx context.Context) {
 }
 
 func Inject(ctx context.Context, port int, debug bool) {
+	// 加载调用库
+	log("Load dll:", libSdk)
+	var err error
+	gblDll, err = syscall.LoadDLL(libSdk)
+	if err != nil {
+		logging.ErrorWithErr(err, "Failed to load dll", map[string]interface{}{"hint": "请检查目录下是否放置sdk.dll & spy.dll & spy_debug.dll"})
+		logging.Fatal("cannot inject success!", -1000)
+	}
+
 	logging.Info("### Inject SDK into WeChat ###")
 	logging.Info(fmt.Sprintf("Set sdk port: %d, debug: %t", port, debug))
 
