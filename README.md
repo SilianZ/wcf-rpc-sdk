@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/Clov614/wcf-rpc-sdk.svg)](https://pkg.go.dev/github.com/Clov614/wcf-rpc-sdk)
 
-一个简单的 Go 语言 SDK，用于与 WCF (Windows Communication Foundation) RPC 服务进行交互。
+一个简单的 Go 语言 SDK，用于与 WCF (WeChat Ferry) RPC 服务进行交互。
 
 ## 安装
 
