@@ -1,4 +1,4 @@
-module wcf-rpc-sdk
+module github.com/Clov614/wcf-rpc-sdk
 
 go 1.22
 

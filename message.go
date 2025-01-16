@@ -8,8 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"wcf-rpc-sdk/internal/manager"
-	"wcf-rpc-sdk/logging"
+	"github.com/Clov614/wcf-rpc-sdk/internal/manager"
+	"github.com/Clov614/wcf-rpc-sdk/logging"
 )
 
 var (

@@ -8,13 +8,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Clov614/wcf-rpc-sdk/internal/manager"
+	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
+	"github.com/Clov614/wcf-rpc-sdk/logging"
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
+	"os"
 	"strconv"
 	"strings"
-	"wcf-rpc-sdk/internal/manager"
-	"wcf-rpc-sdk/internal/wcf"
-	"wcf-rpc-sdk/logging"
+	"syscall"
 )
 
 const (
@@ -122,19 +124,25 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
-	if autoInject {
+	var syncSignal = make(chan os.Signal, 1) // 同步信号 确保注入后处理消息
+	if autoInject {                          // 自动注入
 		port, err := strconv.Atoi(c.addr[strings.LastIndex(c.addr, ":")+1:])
 		if err != nil {
 			logging.ErrorWithErr(err, "the port is invalid, please check your address")
 			logging.Fatal("canot auto inject!", 1000, map[string]interface{}{"port": port})
 		}
+
 		go func() {
 			Inject(c.ctx, port, sdkDebug) // 调用sdk.dll 注入&启动微信
+			syncSignal <- syscall.SIGINT
 		}()
 
 	}
-
-	go func() { // 处理接收消息
+	if autoInject { // todo test 待测试
+		<-syncSignal
+	}
+	close(syncSignal) // 关闭同步
+	go func() {       // 处理接收消息
 		err := c.handleMsg(c.ctx)
 		if err != nil {
 			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)

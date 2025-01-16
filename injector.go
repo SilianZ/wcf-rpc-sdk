@@ -7,11 +7,11 @@ package wcf_rpc_sdk
 import (
 	"context"
 	"fmt"
+	"github.com/Clov614/wcf-rpc-sdk/logging"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"wcf-rpc-sdk/logging"
 )
 
 const libSdk = "sdk.dll"

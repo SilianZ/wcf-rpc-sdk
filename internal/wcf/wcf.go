@@ -3,6 +3,7 @@ package wcf
 import (
 	"context"
 	"fmt"
+	"github.com/Clov614/wcf-rpc-sdk/logging"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol"
 	"go.nanomsg.org/mangos/v3/protocol/pair1"
@@ -10,7 +11,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"strconv"
 	"strings"
-	"wcf-rpc-sdk/logging"
 )
 
 type Client struct {
