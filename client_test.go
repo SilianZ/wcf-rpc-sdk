@@ -73,3 +73,33 @@ func TestClient_GetContacts(t *testing.T) {
 	}
 
 }
+
+func TestClient_GetRoomMember(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	roomId := "45959390469@chatroom"
+	wxids, err := client.GetRoomMember(roomId)
+	if err != nil {
+		t.Fatalf("GetRoomMember failed: %v", err)
+	}
+
+	// 打印解码后的字符串
+	t.Logf("Decoded string for roomId %s: %v", roomId, wxids)
+}
+
+func TestClient_GetSelfInfo(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	info := client.GetSelfInfo()
+	t.Logf("%#v", info)
+}

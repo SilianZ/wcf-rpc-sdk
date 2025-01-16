@@ -14,6 +14,7 @@ import (
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -188,6 +189,43 @@ func (c *Client) GetContacts() (Contacts, error) {
 		})
 	}
 	return contactList, nil
+}
+
+// GetRoomMember 获取群成员信息，返回解码后的字符串以及 wxid 列表
+func (c *Client) GetRoomMember(roomId string) ([]string, error) {
+	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
+	logging.Debug("GetRoomMember", map[string]interface{}{"roomId": roomId, "contacts": contacts})
+
+	if len(contacts) == 0 || len(contacts[0].GetFields()) == 0 {
+		return nil, fmt.Errorf("no room data found for roomId: %s", roomId)
+	}
+
+	decodedString := string(contacts[0].GetFields()[0].Content)
+	logging.Debug("GetRoomMember", map[string]interface{}{"roomId": roomId, "decodedString": decodedString}) // 打印解码后的字符串
+
+	// 使用正则表达式提取 wxid
+	re := regexp.MustCompile(`\n\x19\n\x13(wxid_[a-zA-Z0-9]+)\x12\x00\x18`)
+	matches := re.FindAllStringSubmatch(decodedString, -1)
+
+	var wxids []string
+	for _, match := range matches {
+		wxids = append(wxids, match[1])
+	}
+
+	return wxids, nil
+}
+
+// todo GetAllRoomMember
+
+// GetSelfInfo 获取账号个人信息
+func (c *Client) GetSelfInfo() *UserInfo {
+	u := c.wxClient.GetUserInfo()
+	return &UserInfo{
+		Wxid:   u.Wxid,
+		Name:   u.Name,
+		Mobile: u.Mobile,
+		Home:   u.Home,
+	}
 }
 
 // todo 图片解码模块
