@@ -24,6 +24,7 @@ const (
 
 var (
 	ErrNotLogin = errors.New("not login")
+	ErrNull     = errors.New("null")
 )
 
 type Client struct {
@@ -143,12 +144,36 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 
 // SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>
 func (c *Client) SendText(receiver string, content string, ats ...string) error {
+	// todo test 需要手动在content里添加上 @<Name>
+	// todo 可能需要搭配 根据wxid查询到对应的Name
+	// todo 增加一个wxid的全局cache
 	res := c.wxClient.SendTxt(content, receiver, ats)
 	if res != 0 {
 		logging.Debug("wxCliend.SendTxt", map[string]interface{}{"res": res, "receiver": receiver, "content": content, "ats": ats})
 		return fmt.Errorf("wxClient.SendTxt err, code: %d", res)
 	}
 	return nil
+}
+
+func (c *Client) GetContacts() (Contacts, error) {
+	contacts := c.wxClient.GetContacts()
+	if len(contacts) == 0 {
+		return nil, fmt.Errorf("get contacts err: %w", ErrNull)
+	}
+	contactList := make(Contacts, 0, len(contacts))
+	for _, contact := range contacts {
+		contactList = append(contactList, &Contact{
+			Wxid:     contact.Wxid,
+			Code:     contact.Code,
+			Remark:   contact.Remark,
+			Name:     contact.Name,
+			Country:  contact.Country,
+			Province: contact.Province,
+			City:     contact.City,
+			Gender:   contact.Gender,
+		})
+	}
+	return contactList, nil
 }
 
 // todo 图片解码模块
