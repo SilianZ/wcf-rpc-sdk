@@ -110,8 +110,8 @@ func NewClient(msgChanSize int) *Client {
 	}
 }
 
-// Run 运行tcp监听 以及 请求tcp监听信息 <是否debug> <是否自动注入微信（自动打开微信）>
-func (c *Client) Run(debug bool, autoInject bool) {
+// Run 运行tcp监听 以及 请求tcp监听信息 <是否debug> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
+func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		logging.Debug("Debug mode enabled")
@@ -124,7 +124,10 @@ func (c *Client) Run(debug bool, autoInject bool) {
 			logging.ErrorWithErr(err, "the port is invalid, please check your address")
 			logging.Fatal("canot auto inject!", 1000, map[string]interface{}{"port": port})
 		}
-		Inject(port, debug) // 调用sdk.dll 注入&启动微信
+		go func() {
+			Inject(c.ctx, port, sdkDebug) // 调用sdk.dll 注入&启动微信
+		}()
+
 	}
 
 	go func() { // 处理接收消息
@@ -135,5 +138,4 @@ func (c *Client) Run(debug bool, autoInject bool) {
 	}()
 }
 
-// todo 注入模块
 // todo 图片解码模块

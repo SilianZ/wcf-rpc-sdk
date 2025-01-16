@@ -3,11 +3,13 @@ package wcf
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 )
 
-const testAddr = "tcp://192.168.150.128:10086" // 请修改为你的 WCF 服务端地址
+// const testAddr = "tcp://192.168.150.128:10086" // 请修改为你的 WCF 服务端地址
+var testAddr = os.Getenv("TEST_ADDR") // 请修改为你的 WCF 服务端地址
 
 func TestClient_IsLogin(t *testing.T) {
 	c, err := NewWCF(testAddr)

@@ -5,6 +5,7 @@
 package wcf_rpc_sdk
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -55,35 +56,47 @@ func callFunc(funName string, title string, debug bool, port int) {
 }
 
 /** 监听并等待SIGINT信号 */
-func waitingSignal() {
+func waitingSignal(ctx context.Context) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	log("Is running, press Ctrl+C to quit.")
-	<-sigChan
-	log("Stopped!")
+	logging.Info("Is running, press Ctrl+C to quit.")
+	select {
+	case <-ctx.Done():
+		logging.Info("Context cancelled, exiting.")
+	case <-sigChan:
+		logging.Info("Signal received, exiting.")
+	}
+	logging.Info("Stopped!")
 }
 
-func Inject(port int, debug bool) {
+func Inject(ctx context.Context, port int, debug bool) {
 	logging.Info("### Inject SDK into WeChat ###")
 	logging.Info(fmt.Sprintf("Set sdk port: %d, debug: %t", port, debug))
 
 	startAt := time.Now()
 	for {
-		if func() bool {
-			defer func() {
-				if r := recover(); r != nil { // 注入失败时反复重试
-					logging.Warn(fmt.Sprintf("Get panic: %v, Wait for retry...", r))
-					time.Sleep(3 * time.Second)
-				}
-			}()
-			callFunc(funcInject, "Inject SDK...", debug, port)
-			return true
-		}() {
-			break
+		select {
+		case <-ctx.Done():
+			logging.Info("Injection process cancelled.")
+			return
+		default:
+			if func() bool {
+				defer func() {
+					if r := recover(); r != nil { // 注入失败时反复重试
+						logging.Warn(fmt.Sprintf("Get panic: %v, Wait for retry...", r))
+						time.Sleep(3 * time.Second)
+					}
+				}()
+				callFunc(funcInject, "Inject SDK...", debug, port)
+				return true
+			}() {
+				goto InjectSuccess
+			}
 		}
 	}
+InjectSuccess:
 	logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
-	waitingSignal()
+	waitingSignal(ctx)
 	callFunc(funcDestroy, "SDK destroy", debug, port)
 	_ = gblDll.Release()
 }
