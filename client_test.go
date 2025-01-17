@@ -211,3 +211,26 @@ func TestClient_GetAllChatRoom(t *testing.T) {
 		t.Logf("ChatRoom Info: %#v", chatroom)
 	}
 }
+
+func TestClient_ReplyText(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	msg, err := client.GetMsg()
+	if err != nil {
+		t.Error("接收消息失败:", err.Error())
+	}
+	t.Logf("收到消息: %+v\n", msg)
+
+	// 如果是文本消息，则回复
+	if msg.Content == "ping" {
+		err = msg.ReplyText("pong")
+		if err != nil {
+			t.Error("回复消息错误", err)
+		}
+	}
+}

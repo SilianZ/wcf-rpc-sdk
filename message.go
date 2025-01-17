@@ -16,7 +16,23 @@ var (
 	ErrBufferFull = errors.New("the message buffer is full")
 )
 
+type IMeta interface {
+	ReplyText(content string, ats ...string) error
+}
+
+// 用于回调
+type meta struct {
+	sender   string // 消息发送者
+	sendText func(receiver string, content string, ats ...string) error
+}
+
+// ReplyText 回复文本
+func (m *meta) ReplyText(content string, ats ...string) error {
+	return m.sendText(m.sender, content, ats...)
+}
+
 type Message struct {
+	meta      IMeta             // 用于实现对客户端操作
 	IsSelf    bool              `json:"is_self,omitempty"`
 	IsGroup   bool              `json:"is_group,omitempty"`
 	MessageId uint64            `json:"message_id,omitempty"`
@@ -35,7 +51,10 @@ type Message struct {
 	//Contacts *Contacts `json:"contact,omitempty"`
 }
 
-//todo Message.Reply()
+// ReplyText 回复文本
+func (m *Message) ReplyText(content string, ats ...string) error {
+	return m.meta.ReplyText(content, ats...)
+}
 
 type MessageBuffer struct {
 	msgCH chan *Message // 原始消息输入通道

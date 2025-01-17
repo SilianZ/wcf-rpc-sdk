@@ -40,9 +40,7 @@ type Client struct {
 	wxClient     *wcf.Client
 	addr         string // 接口地址
 	self         *Self
-	// todo 群组信息缓存 （实现获取群组信息Func）
-	// todo 用户信息缓存 （实现获取用户信息Func）
-	cacheUser *CacheUserManager
+	cacheUser    *CacheUserManager // 用户信息缓存
 }
 
 // Close 停止客户端
@@ -136,7 +134,7 @@ func (c *Client) GetMsgChan() <-chan *Message {
 func (c *Client) handleMsg(ctx context.Context) (err error) {
 	var handler wcf.MsgHandler = func(msg *wcf.WxMsg) error { // 回调函数
 		// todo 处理图片消息以及其他消息
-		err = c.msgBuffer.Put(c.ctx, covertMsg(msg)) // 缓冲消息（内存中）
+		err = c.msgBuffer.Put(c.ctx, covertMsg(c, msg)) // 缓冲消息（内存中）
 		if err != nil {
 			return fmt.Errorf("MessageHandler err: %w", err)
 		}
@@ -152,8 +150,12 @@ func (c *Client) handleMsg(ctx context.Context) (err error) {
 	return nil
 }
 
-func covertMsg(msg *wcf.WxMsg) *Message {
+func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 	return &Message{
+		meta: &meta{ // meta用于让消息可以直接调用回复
+			sender:   msg.Sender,
+			sendText: cli.SendText,
+		},
 		IsSelf:    msg.IsSelf,
 		IsGroup:   msg.IsGroup,
 		MessageId: msg.Id,
