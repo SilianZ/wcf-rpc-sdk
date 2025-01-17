@@ -112,6 +112,10 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	go c.cyclicUpdateCacheInfo()
 }
 
+func (c *Client) IsLogin() bool {
+	return c.wxClient.IsLogin()
+}
+
 // GetMsg 获取消息 !!!不推荐使用!!!
 // Deprecated
 func (c *Client) GetMsg() (*Message, error) {
