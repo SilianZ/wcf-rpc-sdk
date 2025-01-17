@@ -230,7 +230,7 @@ func (c *Client) GetSelfName() string {
 
 // GetSelfWxId 获取机器人微信ID
 func (c *Client) GetSelfWxId() string {
-	if c.self.Wxid == "" {
+	if c.self == nil || c.self.Wxid == "" {
 		c.GetSelfInfo() // 更新缓存
 	}
 	return c.self.Wxid
