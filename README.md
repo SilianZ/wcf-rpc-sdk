@@ -2,7 +2,12 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/Clov614/wcf-rpc-sdk.svg)](https://pkg.go.dev/github.com/Clov614/wcf-rpc-sdk)
 
-一个简单的 Go 语言 SDK，用于与 WCF (WeChat Ferry) RPC 服务进行交互。
+一个简单的 Go 语言 SDK，用于与 [WCF (WeChat Ferry)](https://github.com/lich0821/WeChatFerry) RPC 服务进行交互。
+
+## 特别鸣谢
+
+- 感谢[lich0821](https://github.com/lich0821)大佬的[WeChatFerry](https://github.com/lich0821/WeChatFerry)项目
+
 
 ## 安装
 
@@ -42,14 +47,29 @@ func main() {
 		}
 	}
 
-	// 获取联系人列表
-	contacts, err := cli.GetContacts()
+	// 获取当前账号的个人信息
+	selfInfo := cli.GetSelfInfo()
+	fmt.Printf("当前账号信息: %+v\n", selfInfo)
+
+	// 获取好友列表
+	friends, err := cli.GetAllFriend()
 	if err != nil {
-		fmt.Println("获取联系人列表失败:", err.Error())
+		fmt.Println("获取好友列表失败:", err.Error())
 	} else {
-		fmt.Println("联系人列表:")
-		for _, contact := range contacts {
-			fmt.Printf("  Wxid: %s, Name: %s, Remark: %s\n", contact.Wxid, contact.Name, contact.Remark)
+		fmt.Println("好友列表:")
+		for _, friend := range *friends {
+			fmt.Printf("  Wxid: %s, Name: %s, Remark: %s\n", friend.Wxid, friend.Name, friend.Remark)
+		}
+	}
+
+	// 获取群组列表
+	chatRooms, err := cli.GetAllChatRoom()
+	if err != nil {
+		fmt.Println("获取群组列表失败:", err.Error())
+	} else {
+		fmt.Println("群组列表:")
+		for _, room := range *chatRooms {
+			fmt.Printf("  RoomId: %s, Name: %s\n", room.Wxid, room.Name)
 		}
 	}
 
@@ -86,10 +106,12 @@ func main() {
     *   第三个 `false` 表示不开启 SDK 调试。
 3. **`time.Sleep(5 * time.Second)`**: 等待 5 秒，让客户端有足够的时间连接到微信。
 4. **`cli.IsLogin()`**: 检查微信是否已经登录。如果未登录，示例代码会打印提示信息并循环等待登录。
-5. **`cli.GetContacts()`**: 获取当前登录微信账号的联系人列表。
-6. **`cli.SendText("filehelper", "你好，这是一条测试消息")`**: 向微信的文件助手 (filehelper) 发送一条文本消息。
-7. **`cli.SendText("your_group_id@chatroom", "这是一条群消息 your_name", "wxid_xxxxxx")`**: 向指定的群聊 (your\_group\_id@chatroom) 发送一条文本消息，并 @ 群成员 (wxid\_jj4mhsji9tjk22)。**注意：你需要将 `your_group_id@chatroom` 和 `wxid_jj4mhsji9tjk22` 替换为实际的群 ID 和成员 wxid。同时，你需要在消息内容中明确写出 `@成员昵称`，例如 `@AkiAoi-evil`。**
-8. **`cli.GetMsg()`**: 循环调用 `GetMsg()` 方法来接收消息。当接收到新消息时，会打印消息内容。
+5. **`cli.GetSelfInfo()`**: 获取当前登录微信账号的个人信息。
+6. **`cli.GetAllFriend()`**: 获取当前登录微信账号的好友列表。
+7. **`cli.GetAllChatRoom()`**: 获取当前登录微信账号的群组列表。
+8. **`cli.SendText("filehelper", "你好，这是一条测试消息")`**: 向微信的文件助手 (filehelper) 发送一条文本消息。
+9. **`cli.SendText("your_group_id@chatroom", "这是一条群消息 your_name", "wxid_xxxxxx")`**: 向指定的群聊 (your\_group\_id@chatroom) 发送一条文本消息，并 @ 群成员 (wxid\_xxxxxx)。**注意：你需要将 `your_group_id@chatroom` 和 `wxid_xxxxxx` 替换为实际的群 ID 和成员 wxid。同时，你需要在消息内容中明确写出 `@成员昵称`，例如 `@<YourName>`。**
+10. **`cli.GetMsg()`**: 循环调用 `GetMsg()` 方法来接收消息。当接收到新消息时，会打印消息内容。
 
 **改进:**
 
@@ -97,3 +119,4 @@ func main() {
 *   添加了循环接收消息的示例。
 *   对每个步骤添加了更详细的注释说明。
 *   强调了发送群消息并 @ 成员时需要替换的参数和注意事项。
+*   **新增了获取当前账号的个人信息、好友列表以及群组列表的示例和说明。**
