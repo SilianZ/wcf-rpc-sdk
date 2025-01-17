@@ -35,6 +35,8 @@ type Message struct {
 	Contacts *Contacts `json:"contact,omitempty"`
 }
 
+//todo Message.Reply()
+
 type MessageBuffer struct {
 	msgCH chan *Message // 原始消息输入通道
 }

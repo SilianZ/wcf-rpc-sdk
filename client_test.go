@@ -5,6 +5,20 @@ import (
 	"time"
 )
 
+// TestClient_Recv 持续接收消息
+func TestClient_Recv(t *testing.T) {
+	// 创建客户端实例
+	cli := NewClient(10)
+
+	// 启动客户端，这里假设不需要自动注入微信
+	cli.Run(false, false, false)
+	// 关闭客户端
+	defer cli.Close()
+	for msg := range cli.GetMsgChan() {
+		t.Log(msg)
+	}
+}
+
 func TestClient_SendTextAndGetMsg(t *testing.T) {
 	// 创建客户端实例
 	client := NewClient(10)

@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -37,6 +38,10 @@ type Client struct {
 	cacheManager *manager.CacheManager
 	wxClient     *wcf.Client
 	addr         string // 接口地址
+	SelfName     string // 机器人昵称
+	SelfWxId     string // 机器人微信ID
+	// todo 群组信息缓存 （实现获取群组信息Func）
+	// todo 用户信息缓存 （实现获取用户信息Func）
 }
 
 // Close 停止客户端
@@ -155,6 +160,7 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)
 		}
 	}()
+	go c.updateSelfInfo() // 启动定时更新
 }
 
 // SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>
@@ -220,11 +226,43 @@ func (c *Client) GetRoomMember(roomId string) ([]string, error) {
 // GetSelfInfo 获取账号个人信息
 func (c *Client) GetSelfInfo() *UserInfo {
 	u := c.wxClient.GetUserInfo()
+	c.SelfName = u.Name // 更新缓存
+	c.SelfWxId = u.Wxid // 更新缓存
 	return &UserInfo{
 		Wxid:   u.Wxid,
 		Name:   u.Name,
 		Mobile: u.Mobile,
 		Home:   u.Home,
+	}
+}
+
+// GetSelfName 获取机器人昵称
+func (c *Client) GetSelfName() string {
+	if c.SelfName == "" {
+		c.GetSelfInfo()
+	}
+	return c.SelfName
+}
+
+// GetSelfWxId 获取机器人微信ID
+func (c *Client) GetSelfWxId() string {
+	if c.SelfWxId == "" {
+		c.GetSelfInfo()
+	}
+	return c.SelfWxId
+}
+
+// updateSelfInfo 定时更新机器人信息
+func (c *Client) updateSelfInfo() {
+	ticker := time.NewTicker(time.Minute * 2)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			c.GetSelfInfo() // 每2分钟更新一次
+		}
 	}
 }
 
