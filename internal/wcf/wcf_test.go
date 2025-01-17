@@ -216,7 +216,7 @@ func TestClient_GetUserInfo(t *testing.T) {
 
 	ui := c.GetUserInfo()
 	if ui == nil {
-		t.Errorf("GetUserInfo() returned nil")
+		t.Errorf("getFriend() returned nil")
 	}
 	fmt.Println("User Info:", ui)
 }

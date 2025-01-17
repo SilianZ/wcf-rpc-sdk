@@ -321,11 +321,11 @@ func (c *Client) DelChatRoomMembers(roomId string, wxIds []string) int32 {
 func (c *Client) GetUserInfo() *UserInfo {
 	err := c.send(genFunReq(Functions_FUNC_GET_USER_INFO).build())
 	if err != nil {
-		logging.ErrorWithErr(err, "internal GetUserInfo err")
+		logging.ErrorWithErr(err, "internal getFriend err")
 	}
 	recv, err := c.Recv()
 	if err != nil {
-		logging.ErrorWithErr(err, "internal GetUserInfo err")
+		logging.ErrorWithErr(err, "internal getFriend err")
 	}
 	return recv.GetUi()
 }

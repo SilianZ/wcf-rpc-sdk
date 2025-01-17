@@ -31,8 +31,8 @@ type Message struct {
 	Xml       string            `json:"xml,omitempty"`
 	FileInfo  *manager.FileInfo `json:"-"` // 图片保存信息
 
-	UserInfo *UserInfo `json:"user_info,omitempty"`
-	Contacts *Contacts `json:"contact,omitempty"`
+	//UserInfo *UserInfo `json:"user_info,omitempty"` todo
+	//Contacts *Contacts `json:"contact,omitempty"`
 }
 
 //todo Message.Reply()
@@ -80,27 +80,40 @@ func (mb *MessageBuffer) Get(ctx context.Context) (*Message, error) {
 	}
 }
 
-// UserInfo 用户信息（当前用户信息）
-type UserInfo struct {
-	Wxid   string `json:"wxid,omitempty"`
-	Name   string `json:"name,omitempty"`
-	Mobile string `json:"mobile,omitempty"`
-	Home   string `json:"home,omitempty"`
+type GenderType uint32
+
+const (
+	UnKnown GenderType = iota
+	Boy
+	Girl
+)
+
+// User 用户抽象通用结构
+type User struct {
+	Wxid     string     `json:"wxid,omitempty"`    // 微信ID (wxid_xxx gh_xxxx  xxxx@chatroom)
+	Code     string     `json:"code,omitempty"`    // 微信号
+	Remark   string     `json:"remark,omitempty"`  // 对其的备注
+	Name     string     `json:"name,omitempty"`    // 用户名\公众号名\群名
+	Country  string     `json:"country,omitempty"` // 国家代码
+	Province string     `json:"province,omitempty"`
+	City     string     `json:"city,omitempty"`
+	Gender   GenderType `json:"gender,omitempty"` // 性别
 }
 
-// Contacts 联系人
-type Contacts []*Contact
-
-type Contact struct {
-	Wxid     string `json:"wxid,omitempty"`
-	Code     string `json:"code,omitempty"`
-	Remark   string `json:"remark,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Country  string `json:"country,omitempty"`
-	Province string `json:"province,omitempty"`
-	City     string `json:"city,omitempty"`
-	Gender   int32  `json:"gender,omitempty"`
+type Self struct { // 机器人自己
+	User
+	Mobile string `json:"mobile,omitempty"` // 个人信息时携带
+	Home   string `json:"home,omitempty"`   // 个人信息时携带
 }
+
+// FriendList 联系人
+type FriendList []*Friend
+type ChatRoomList []*ChatRoom
+type GhList []*GH
+
+type Friend User
+type ChatRoom User // 群组
+type GH User       // todo 公众号
 
 type MsgType int
 

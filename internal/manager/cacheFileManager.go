@@ -22,7 +22,7 @@ var (
 	ErrFileExists  = errors.New("file already exists")
 )
 
-type ICacheManager interface {
+type ICacheFileManager interface {
 	Save(fileName string, isImg bool, data []byte) (*FileInfo, error)
 	GetFilePathByFileName(fileName string) (string, error)
 	GetDataByFileName(fileName string) ([]byte, error)
@@ -39,8 +39,8 @@ type FileInfo struct {
 	Base64   string // 可选，非必须
 }
 
-// CacheManager is the implementation of ICacheManager
-type CacheManager struct {
+// CacheFileManager is the implementation of ICacheFileManager
+type CacheFileManager struct {
 	mu                sync.RWMutex
 	fileName2FileInfo FileName2FileInfo
 	cache             *list.List // LRU 缓存列表
@@ -48,21 +48,21 @@ type CacheManager struct {
 }
 
 var (
-	cacheManager     *CacheManager
+	cacheManager     *CacheFileManager
 	cacheManagerOnce sync.Once
 )
 
-// newCacheManager creates a new CacheManager with the given cache size.
-func newCacheManager(cacheSize int) *CacheManager {
-	return &CacheManager{
+// newCacheManager creates a new CacheFileManager with the given cache size.
+func newCacheManager(cacheSize int) *CacheFileManager {
+	return &CacheFileManager{
 		fileName2FileInfo: make(FileName2FileInfo, cacheSize),
 		cache:             list.New(),
 		capacity:          cacheSize,
 	}
 }
 
-// GetCacheManager returns the singleton instance of CacheManager.
-func GetCacheManager() ICacheManager {
+// GetCacheManager returns the singleton instance of CacheFileManager.
+func GetCacheManager() ICacheFileManager {
 	cacheManagerOnce.Do(func() {
 		cacheManager = newCacheManager(30)
 	})
@@ -70,7 +70,7 @@ func GetCacheManager() ICacheManager {
 }
 
 // Save saves a file by its fileName and writes data to the file system.
-func (cm *CacheManager) Save(fileName string, isImg bool, data []byte) (*FileInfo, error) {
+func (cm *CacheFileManager) Save(fileName string, isImg bool, data []byte) (*FileInfo, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -104,7 +104,7 @@ func (cm *CacheManager) Save(fileName string, isImg bool, data []byte) (*FileInf
 }
 
 // GetFilePathByFileName retrieves the file path by its file name.
-func (cm *CacheManager) GetFilePathByFileName(fileName string) (string, error) {
+func (cm *CacheFileManager) GetFilePathByFileName(fileName string) (string, error) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
@@ -117,7 +117,7 @@ func (cm *CacheManager) GetFilePathByFileName(fileName string) (string, error) {
 }
 
 // GetDataByFileName retrieves the file data by its file name.
-func (cm *CacheManager) GetDataByFileName(fileName string) ([]byte, error) {
+func (cm *CacheFileManager) GetDataByFileName(fileName string) ([]byte, error) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
@@ -136,7 +136,7 @@ func (cm *CacheManager) GetDataByFileName(fileName string) ([]byte, error) {
 }
 
 // GetFileInfoBase64 retrieves the FileInfo and the base64 encoded data of the file by its file name.
-func (cm *CacheManager) GetFileInfoBase64(fileName string) (*FileInfo, error) {
+func (cm *CacheFileManager) GetFileInfoBase64(fileName string) (*FileInfo, error) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
@@ -186,7 +186,7 @@ func getFileExtension(fileName string) string {
 }
 
 // addToCache adds a fileName to the cache.
-func (cm *CacheManager) addToCache(fileName string) {
+func (cm *CacheFileManager) addToCache(fileName string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -216,7 +216,7 @@ func (cm *CacheManager) addToCache(fileName string) {
 }
 
 // moveToFront moves a fileName to the front of the cache.
-func (cm *CacheManager) moveToFront(fileName string) {
+func (cm *CacheFileManager) moveToFront(fileName string) {
 	for e := cm.cache.Front(); e != nil; e = e.Next() {
 		if e.Value.(string) == fileName {
 			cm.cache.MoveToFront(e)
@@ -226,7 +226,7 @@ func (cm *CacheManager) moveToFront(fileName string) {
 }
 
 // Close cleans up the cache files and releases resources.
-func (cm *CacheManager) Close() {
+func (cm *CacheFileManager) Close() {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 

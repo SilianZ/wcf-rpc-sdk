@@ -19,13 +19,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/Clov614/wcf-rpc-sdk"
+	wcf "github.com/Clov614/wcf-rpc-sdk"
 	"time"
 )
 
 func main() {
 	// 创建客户端实例，设置消息缓冲区大小为 10
-	cli := wcf_rpc_sdk.NewClient(10)
+	cli := wcf.NewClient(10)
 
 	// 启动客户端，不开启调试模式，不自动注入微信，不开启 SDK 调试
 	cli.Run(false, false, false)
@@ -79,7 +79,7 @@ func main() {
 
 **说明:**
 
-1. **`cli := wcf_rpc_sdk.NewClient(10)`**: 创建一个 `Client` 实例，并设置消息缓冲区大小为 10。这意味着客户端可以缓存最多 10 条未处理的消息。
+1. **`cli := wcf.NewClient(10)`**: 创建一个 `Client` 实例，并设置消息缓冲区大小为 10。这意味着客户端可以缓存最多 10 条未处理的消息。
 2. **`cli.Run(false, false, false)`**: 启动客户端。
     *   第一个 `false` 表示不开启调试模式。
     *   第二个 `false` 表示不自动注入微信（需要手动打开微信并扫码登录）。

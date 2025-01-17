@@ -76,9 +76,9 @@ func TestClient_GetContacts(t *testing.T) {
 	client.Run(false, false, false)
 
 	// 测试 GetContacts
-	contacts, err := client.GetContacts()
-	if err != nil {
-		t.Fatalf("获取联系人列表失败: %v", err)
+	contacts := client.wxClient.GetContacts()
+	if len(contacts) == 0 {
+		t.Fatalf("获取联系人列表失败: 列表空")
 	}
 
 	// 打印联系人列表
@@ -116,4 +116,98 @@ func TestClient_GetSelfInfo(t *testing.T) {
 
 	info := client.GetSelfInfo()
 	t.Logf("%#v", info)
+}
+
+func TestClient_GetSelfName(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(false, false, false)
+	defer client.Close()
+
+	name := client.GetSelfName()
+	t.Logf("Self Name: %s", name)
+}
+
+func TestClient_GetSelfWxId(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(false, false, false)
+	defer client.Close()
+
+	wxid := client.GetSelfWxId()
+	t.Logf("Self WxId: %s", wxid)
+}
+
+func TestClient_GetFriend(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(false, false, false)
+	defer client.Close()
+
+	// 假设 "filehelper" 是一个已知的好友
+	friend, err := client.GetFriend("wxid_jj4mhsji9tjk22")
+	if err != nil {
+		t.Fatalf("getFriend failed: %v", err)
+	}
+
+	t.Logf("Friend Info: %#v", friend)
+}
+
+func TestClient_GetAllFriend(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	friends, err := client.GetAllFriend()
+	if err != nil {
+		t.Fatalf("getAllFriend failed: %v", err)
+	}
+
+	for _, friend := range *friends {
+		t.Logf("Friend Info: %#v", friend)
+	}
+}
+
+func TestClient_GetChatRoom(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	// 假设 "45959390469@chatroom" 是一个已知的群聊
+	chatroom, err := client.GetChatRoom("45959390469@chatroom")
+	if err != nil {
+		t.Fatalf("getChatRoom failed: %v", err)
+	}
+
+	t.Logf("ChatRoom Info: %#v", chatroom)
+}
+
+func TestClient_GetAllChatRoom(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	chatrooms, err := client.GetAllChatRoom()
+	if err != nil {
+		t.Fatalf("getAllChatRoom failed: %v", err)
+	}
+
+	for _, chatroom := range *chatrooms {
+		t.Logf("ChatRoom Info: %#v", chatroom)
+	}
 }
