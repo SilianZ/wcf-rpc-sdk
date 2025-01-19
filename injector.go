@@ -7,7 +7,7 @@ package wcf_rpc_sdk
 import (
 	"context"
 	"fmt"
-	"github.com/Clov614/wcf-rpc-sdk/logging"
+	"github.com/Clov614/logging"
 	"os"
 	"os/signal"
 	"syscall"
@@ -76,7 +76,7 @@ func Inject(ctx context.Context, port int, debug bool) {
 	gblDll, err = syscall.LoadDLL(libSdk)
 	if err != nil {
 		logging.ErrorWithErr(err, "Failed to load dll", map[string]interface{}{"hint": "请检查目录下是否放置sdk.dll & spy.dll & spy_debug.dll"})
-		logging.Fatal("cannot inject success!", -1000)
+		logging.Fatal("inject failed!", -1000)
 	}
 
 	logging.Info("### Inject SDK into WeChat ###")

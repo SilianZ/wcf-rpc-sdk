@@ -3,7 +3,7 @@ package wcf
 import (
 	"context"
 	"fmt"
-	"github.com/Clov614/wcf-rpc-sdk/logging"
+	"github.com/Clov614/logging"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol"
 	"go.nanomsg.org/mangos/v3/protocol/pair1"

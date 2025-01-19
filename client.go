@@ -8,9 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Clov614/logging"
 	"github.com/Clov614/wcf-rpc-sdk/internal/manager"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
-	"github.com/Clov614/wcf-rpc-sdk/logging"
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
 	"os"
@@ -29,7 +29,7 @@ const (
 
 var (
 	ErrNotLogin = errors.New("not login")
-	ErrNull     = errors.New("null")
+	ErrNull     = errors.New("null err")
 )
 
 type Client struct {
@@ -84,6 +84,8 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
+	// 增加项目字段
+	logging.SetField(map[string]interface{}{"sdk": "wcf-rpc-sdk"})
 	var syncSignal = make(chan os.Signal, 1) // 同步信号 确保注入后处理消息
 	if autoInject {                          // 自动注入
 		port, err := strconv.Atoi(c.addr[strings.LastIndex(c.addr, ":")+1:])
@@ -105,7 +107,7 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	go func() {       // 处理接收消息
 		err := c.handleMsg(c.ctx)
 		if err != nil {
-			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)
+			logging.ErrorWithErr(err, "handle message err")
 		}
 	}()
 	go c.cyclicUpdateSelfInfo() // 启动定时更新
@@ -138,7 +140,11 @@ func (c *Client) GetMsgChan() <-chan *Message {
 func (c *Client) handleMsg(ctx context.Context) (err error) {
 	var handler wcf.MsgHandler = func(msg *wcf.WxMsg) error { // 回调函数
 		// todo 处理图片消息以及其他消息
-		err = c.msgBuffer.Put(c.ctx, covertMsg(c, msg)) // 缓冲消息（内存中）
+		covertedMsg := covertMsg(c, msg)
+		if covertedMsg == nil {
+			return ErrNull
+		}
+		err = c.msgBuffer.Put(c.ctx, covertedMsg) // 缓冲消息（内存中）
 		if err != nil {
 			return fmt.Errorf("MessageHandler err: %w", err)
 		}
@@ -155,6 +161,10 @@ func (c *Client) handleMsg(ctx context.Context) (err error) {
 }
 
 func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
+	if msg == nil {
+		logging.ErrorWithErr(ErrNull, "internal msg is nil")
+		return nil
+	}
 	return &Message{
 		meta: &meta{ // meta用于让消息可以直接调用回复
 			sender:   msg.Sender,
@@ -217,6 +227,9 @@ func (c *Client) GetRoomMember(roomId string) ([]string, error) {
 // GetSelfInfo 获取账号个人信息
 func (c *Client) GetSelfInfo() *Self {
 	u := c.wxClient.GetUserInfo()
+	if u == nil {
+		logging.ErrorWithErr(ErrNull, "get self info err")
+	}
 	self := &Self{}
 	self.Wxid = u.Wxid
 	self.Name = u.Name

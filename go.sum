@@ -1,3 +1,5 @@
+github.com/Clov614/logging v0.1.2 h1:DuzFJ7MXpwYyEASoHYr5lZnUchKow36/u3F0p5dhg5Q=
+github.com/Clov614/logging v0.1.2/go.mod h1:Vxr9X5cvKXT17F/iBeBj8w6WSAuBQppsvtoCi0UXxe0=
 github.com/Microsoft/go-winio v0.5.2 h1:a9IhgEQBCUEk6QCdml9CiJGhAws+YwffDHEMp1VMrpA=
 github.com/Microsoft/go-winio v0.5.2/go.mod h1:WpS1mjBmmwHBEWmogvA2mj8546UReBk4v8QkMxJ6pZY=
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=

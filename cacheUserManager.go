@@ -6,7 +6,7 @@ package wcf_rpc_sdk
 
 import (
 	"fmt"
-	"github.com/Clov614/wcf-rpc-sdk/logging"
+	"github.com/Clov614/logging"
 	"sync"
 )
 
