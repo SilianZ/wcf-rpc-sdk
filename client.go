@@ -168,11 +168,7 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 	if !msg.IsGroup { // 不是群组消息
 		msg.Roomid = "" // 置空
 	}
-	return &Message{
-		meta: &meta{ // meta用于让消息可以直接调用回复
-			sender:   msg.Sender,
-			sendText: cli.SendText,
-		},
+	m := &Message{
 		IsSelf:    msg.IsSelf,
 		IsGroup:   msg.IsGroup,
 		MessageId: msg.Id,
@@ -186,6 +182,17 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		Extra:     msg.Extra,
 		Xml:       msg.Xml,
 	}
+	var sender = m.WxId
+	if m.IsGroup { // 群组则回复消息至群组
+		sender = m.RoomId
+	}
+	metaData := &meta{ // meta用于让消息可以直接调用回复
+		rawMsg:   m,
+		sender:   sender,
+		sendText: cli.SendText,
+	}
+	m.meta = metaData
+	return m
 }
 
 // SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>

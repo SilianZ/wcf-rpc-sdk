@@ -22,7 +22,8 @@ type IMeta interface {
 
 // 用于回调
 type meta struct {
-	sender   string // 消息发送者
+	rawMsg   *Message
+	sender   string
 	sendText func(receiver string, content string, ats ...string) error
 }
 
