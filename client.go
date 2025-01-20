@@ -165,6 +165,9 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		logging.ErrorWithErr(ErrNull, "internal msg is nil")
 		return nil
 	}
+	if !msg.IsGroup { // 不是群组消息
+		msg.Roomid = "" // 置空
+	}
 	return &Message{
 		meta: &meta{ // meta用于让消息可以直接调用回复
 			sender:   msg.Sender,
