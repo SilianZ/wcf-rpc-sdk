@@ -107,7 +107,7 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	go func() {       // 处理接收消息
 		err := c.handleMsg(c.ctx)
 		if err != nil {
-			logging.ErrorWithErr(err, "handle message err")
+			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)
 		}
 	}()
 	go c.cyclicUpdateSelfInfo() // 启动定时更新
@@ -229,6 +229,7 @@ func (c *Client) GetSelfInfo() *Self {
 	u := c.wxClient.GetUserInfo()
 	if u == nil {
 		logging.ErrorWithErr(ErrNull, "get self info err")
+		return c.self
 	}
 	self := &Self{}
 	self.Wxid = u.Wxid
@@ -244,6 +245,9 @@ func (c *Client) GetSelfName() string {
 	if c.self.Name == "" {
 		c.GetSelfInfo() // 更新缓存
 	}
+	if c.self == nil {
+		return ""
+	}
 	return c.self.Name
 }
 
@@ -251,6 +255,9 @@ func (c *Client) GetSelfName() string {
 func (c *Client) GetSelfWxId() string {
 	if c.self == nil || c.self.Wxid == "" {
 		c.GetSelfInfo() // 更新缓存
+	}
+	if c.self == nil {
+		return ""
 	}
 	return c.self.Wxid
 }
