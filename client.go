@@ -165,8 +165,19 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		logging.ErrorWithErr(ErrNull, "internal msg is nil")
 		return nil
 	}
+	var contactInfos []*ContactInfo
 	if !msg.IsGroup { // 不是群组消息
 		msg.Roomid = "" // 置空
+	} else {
+		roomMemberIds, err := cli.GetRoomMember(msg.Roomid)
+		if err != nil {
+			logging.ErrorWithErr(err, "GetRoomMember")
+		} else {
+			contactInfos, err = cli.GetMember(roomMemberIds...)
+			if err != nil {
+				logging.ErrorWithErr(err, "GetMember")
+			}
+		}
 	}
 	m := &Message{
 		IsSelf:    msg.IsSelf,
@@ -175,6 +186,7 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		Type:      msg.Type,
 		Ts:        msg.Ts,
 		RoomId:    msg.Roomid,
+		RoomData:  &RoomData{Members: contactInfos},
 		Content:   msg.Content,
 		WxId:      msg.Sender,
 		Sign:      msg.Sign,
@@ -341,7 +353,7 @@ func (c *Client) GetAllFriend() (*FriendList, error) {
 	return res, nil
 }
 
-// GetChatRoom 根据roomId获取群组信息
+// GetChatRoom 根据roomId获取群组信息 todo 完善ChatRoom字段
 func (c *Client) GetChatRoom(roomId string) (*ChatRoom, error) {
 	info, err := c.getInfo(roomId, false, roomType, 3, c.cacheUser.Get)
 	if err != nil {
@@ -352,7 +364,7 @@ func (c *Client) GetChatRoom(roomId string) (*ChatRoom, error) {
 	return res, nil
 }
 
-// GetAllChatRoom 获取所有群组信息
+// GetAllChatRoom 获取所有群组信息 todo 完善ChatRoom字段
 func (c *Client) GetAllChatRoom() (*ChatRoomList, error) {
 	info, err := c.getInfo("", true, roomType, 3, c.cacheUser.Get)
 	if err != nil {
@@ -364,24 +376,30 @@ func (c *Client) GetAllChatRoom() (*ChatRoomList, error) {
 }
 
 // GetMember 根据wxid获取成员（包括群组陌生人）
-func (c *Client) GetMember(wxid string) (*ContactInfo, error) {
-	info, err := c.getInfo(wxid, false, memberType, 3, c.cacheUser.Get)
-	if err != nil {
-		logging.ErrorWithErr(err, "get member by wxid err")
-		return nil, err
+func (c *Client) GetMember(wxidList ...string) ([]*ContactInfo, error) {
+	var result = make([]*ContactInfo, 0, len(wxidList))
+	for _, wxid := range wxidList {
+		info, err := c.getInfo(wxid, false, memberType, 3, c.cacheUser.Get)
+		if err != nil {
+			logging.ErrorWithErr(err, "get member by wxid err")
+			continue
+		}
+		result = append(result, info.(*ContactInfo))
 	}
-	res, _ := info.(*ContactInfo)
-	return res, nil
+	if len(result) == 0 {
+		return nil, ErrNull
+	}
+	return result, nil
 }
 
 // GetAllMember 获取全部成员（包括群组陌生人）
-func (c *Client) GetAllMember() (*[]*ContactInfo, error) {
+func (c *Client) GetAllMember() ([]*ContactInfo, error) {
 	info, err := c.getInfo("", true, memberType, 3, c.cacheUser.Get)
 	if err != nil {
 		logging.ErrorWithErr(err, "get all member err")
 		return nil, err
 	}
-	res, _ := info.(*[]*ContactInfo)
+	res, _ := info.([]*ContactInfo)
 	return res, nil
 }
 

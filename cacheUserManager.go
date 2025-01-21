@@ -131,13 +131,13 @@ func (cm *CacheUserManager) GetMember(wxId string) (*ContactInfo, error) {
 }
 
 // GetAllMember 获取全部联系人（包括群聊陌生群成员）
-func (cm *CacheUserManager) GetAllMember() (*[]*ContactInfo, error) {
+func (cm *CacheUserManager) GetAllMember() ([]*ContactInfo, error) {
 	list := make([]*ContactInfo, 0, cm.memberCount)
 	cm.memberCache.Range(func(key, value interface{}) bool {
 		list = append(list, value.(*ContactInfo))
 		return true
 	})
-	return &list, nil
+	return list, nil
 }
 
 // UpdateMembers 更新所有联系人（包括群聊陌生群成员）

@@ -40,6 +40,7 @@ type Message struct {
 	Type      uint32            `json:"type,omitempty"`
 	Ts        uint32            `json:"ts,omitempty"`
 	RoomId    string            `json:"room_id,omitempty"`
+	RoomData  *RoomData         `json:"room_data,omitempty"`
 	Content   string            `json:"content,omitempty"`
 	WxId      string            `json:"wx_id,omitempty"`
 	Sign      string            `json:"sign,omitempty"`
