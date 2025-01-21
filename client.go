@@ -313,7 +313,7 @@ func isNil(i interface{}) bool {
 func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(id string, isAll bool, t InfoType) (interface{}, error)) (interface{}, error) {
 	result, err := f(wxid, isAll, t)
 	if retry > 0 && isNil(result) {
-		c.updateCacheInfo()
+		c.updateCacheInfo(false) // 不异步更新
 		return c.getInfo(wxid, isAll, t, retry-1, f)
 	}
 	return result, err
@@ -324,7 +324,7 @@ func (c *Client) GetFriend(wxid string) (*Friend, error) {
 	info, err := c.getInfo(wxid, false, friendType, 3, c.cacheUser.Get)
 	if err != nil {
 		logging.ErrorWithErr(err, "get friend err", map[string]interface{}{"wxid": wxid})
-
+		return nil, err
 	}
 	res, _ := info.(*Friend)
 	return res, nil
@@ -335,7 +335,7 @@ func (c *Client) GetAllFriend() (*FriendList, error) {
 	info, err := c.getInfo("", true, friendType, 3, c.cacheUser.Get)
 	if err != nil {
 		logging.ErrorWithErr(err, "get all friend err")
-
+		return nil, err
 	}
 	res, _ := info.(*FriendList)
 	return res, nil
@@ -346,7 +346,7 @@ func (c *Client) GetChatRoom(roomId string) (*ChatRoom, error) {
 	info, err := c.getInfo(roomId, false, roomType, 3, c.cacheUser.Get)
 	if err != nil {
 		logging.ErrorWithErr(err, "get all friend err")
-
+		return nil, err
 	}
 	res, _ := info.(*ChatRoom)
 	return res, nil
@@ -357,9 +357,31 @@ func (c *Client) GetAllChatRoom() (*ChatRoomList, error) {
 	info, err := c.getInfo("", true, roomType, 3, c.cacheUser.Get)
 	if err != nil {
 		logging.ErrorWithErr(err, "get all friend err")
-
+		return nil, err
 	}
 	res, _ := info.(*ChatRoomList)
+	return res, nil
+}
+
+// GetMember 根据wxid获取成员（包括群组陌生人）
+func (c *Client) GetMember(wxid string) (*ContactInfo, error) {
+	info, err := c.getInfo(wxid, false, memberType, 3, c.cacheUser.Get)
+	if err != nil {
+		logging.ErrorWithErr(err, "get member by wxid err")
+		return nil, err
+	}
+	res, _ := info.(*ContactInfo)
+	return res, nil
+}
+
+// GetAllMember 获取全部成员（包括群组陌生人）
+func (c *Client) GetAllMember() (*[]*ContactInfo, error) {
+	info, err := c.getInfo("", true, memberType, 3, c.cacheUser.Get)
+	if err != nil {
+		logging.ErrorWithErr(err, "get all member err")
+		return nil, err
+	}
+	res, _ := info.(*[]*ContactInfo)
 	return res, nil
 }
 
@@ -372,17 +394,25 @@ func (c *Client) cyclicUpdateCacheInfo() {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			c.updateCacheInfo() // 每分钟更新一次
+			c.updateCacheInfo(true) // 每分钟更新一次
 		}
 	}
 }
 
-// 更新缓存用户信息
-func (c *Client) updateCacheInfo() {
+// 更新缓存用户信息 <isAsync GetAllMember是否异步>
+func (c *Client) updateCacheInfo(isAsync bool) {
 	contacts := c.wxClient.GetContacts()
 	if len(contacts) == 0 {
 		logging.ErrorWithErr(ErrNull, "get contacts err")
 		return
+	}
+	waitSignal := make(chan struct{}, 1)
+	go func() { // 异步
+		c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
+		close(waitSignal)                           // 放行
+	}()
+	if !isAsync {
+		<-waitSignal // 等待执行完联系人的
 	}
 	for _, contact := range contacts {
 		user := c.getUser(contact)
@@ -421,7 +451,7 @@ func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
 	case strings.HasPrefix(ct.Wxid, "wxid_"):
 		return Friend(user)
 	case strings.HasSuffix(ct.Wxid, "@chatroom"):
-		return ChatRoom(user)
+		return ChatRoom{User: user}
 	case strings.HasPrefix(ct.Wxid, "gh_"):
 		return GH(user)
 	default:
@@ -435,3 +465,72 @@ func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
 // todo 发送图片
 
 // todo 对应消息的回复 message.Reply(xx)
+
+// getAllMember 获取所有的联系人（包括群聊中的陌生群成员）
+func (c *Client) getAllMember() *[]*ContactInfo {
+	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "select * from Contact;")
+	if len(contacts) == 0 {
+		logging.Error("client.getAllMember: contact not found")
+		return nil
+	}
+	var memberList = make([]*ContactInfo, 0, len(contacts))
+	for _, contact := range contacts {
+		var cInfo = &ContactInfo{}
+		for _, field := range contact.Fields {
+			switch field.Column {
+			case "UserName":
+				cInfo.Wxid = string(field.Content)
+			case "Alias":
+				cInfo.Alias = string(field.Content)
+			case "DelFlag":
+				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+					cInfo.DelFlag = uint8(num)
+				} else {
+					// 处理错误，例如记录日志或设置默认值
+					// t.Logf("Error parsing DelFlag: %v", err)
+					logging.WarnWithErr(err, "error parsing DelFlag")
+					cInfo.DelFlag = 0 // todo 或者其他默认值
+				}
+			case "Type":
+				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+					cInfo.ContactType = uint8(num)
+				} else {
+					cInfo.ContactType = 0
+				}
+			case "Remark":
+				cInfo.Remark = string(field.Content)
+			case "NickName":
+				cInfo.NickName = string(field.Content)
+			case "PYInitial":
+				cInfo.PyInitial = string(field.Content)
+			case "QuanPin":
+				cInfo.QuanPin = string(field.Content)
+			case "RemarkPYInitial":
+				cInfo.RemarkPyInitial = string(field.Content)
+			case "RemarkQuanPin":
+				cInfo.RemarkQuanPin = string(field.Content)
+			case "SmallHeadImgUrl":
+				cInfo.SmallHeadURL = string(field.Content)
+			case "BigHeadImgUrl":
+				cInfo.BigHeadURL = string(field.Content)
+			}
+		}
+		// 查询小头像和大头像
+		if cInfo.Wxid != "" {
+			query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
+			for _, row := range query {
+				for _, field := range row.Fields {
+					switch field.Column {
+					case "smallHeadImgUrl":
+						cInfo.SmallHeadURL = string(field.Content)
+					case "bigHeadImgUrl":
+						cInfo.BigHeadURL = string(field.Content)
+					}
+				}
+			}
+		}
+		memberList = append(memberList, cInfo)
+	}
+	logging.Debug("client.getAllMember()", map[string]interface{}{"memberList": memberList})
+	return &memberList
+}

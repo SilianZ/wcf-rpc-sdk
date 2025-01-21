@@ -132,8 +132,46 @@ type ChatRoomList []*ChatRoom
 type GhList []*GH
 
 type Friend User
-type ChatRoom User // 群组
-type GH User       // todo 公众号
+type ChatRoom struct { // 群聊
+	User
+	RoomID           string    `json:"room_id"`
+	RoomData         *RoomData `json:"room_data"`                   // 群聊成员
+	RoomHeadImgURL   *string   `json:"room_head_img_url,omitempty"` // 群聊头像
+	RoomAnnouncement *string   `json:"room_announcement,omitempty"` // 公告
+}
+
+type RoomData struct {
+	Members []*ContactInfo `json:"members,omitempty"` // 成员列表
+}
+
+type ContactInfo struct {
+	// 微信ID
+	Wxid string `json:"wxid"`
+	// 微信号
+	Alias string `json:"alias,omitempty"`
+	// 删除标记
+	DelFlag uint8 `json:"del_flag"`
+	// 类型
+	ContactType uint8 `json:"contact_type"`
+	// 备注
+	Remark string `json:"remark,omitempty"`
+	// 昵称
+	NickName string `json:"nick_name,omitempty"`
+	// 昵称拼音首字符
+	PyInitial string `json:"py_initial,omitempty"`
+	// 昵称全拼
+	QuanPin string `json:"quan_pin,omitempty"`
+	// 备注拼音首字母
+	RemarkPyInitial string `json:"remark_py_initial,omitempty"`
+	// 备注全拼
+	RemarkQuanPin string `json:"remark_quan_pin,omitempty"`
+	// 小头像
+	SmallHeadURL string `json:"small_head_url,omitempty"`
+	// 大头像
+	BigHeadURL string `json:"big_head_url,omitempty"`
+}
+
+type GH User // todo 公众号
 
 type MsgType int
 

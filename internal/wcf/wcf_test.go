@@ -1,7 +1,9 @@
 package wcf
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"testing"
@@ -512,4 +514,91 @@ func TestClient_ForwardMsg(t *testing.T) {
 	if status != 1 {
 		t.Errorf("ForwardMsg() = %v, want 1", status)
 	}
+}
+
+func TestClient_GetContactByWxId(t *testing.T) {
+	c, err := NewWCF(testAddr)
+	if err != nil {
+		t.Fatalf("NewWCF() error = %v", err)
+	}
+	defer c.Close()
+	query := c.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", "wxid_pagpb98c6nj722"))
+	t.Log("query:", query)
+}
+
+func TestClient_GetContactByDB(t *testing.T) {
+	c, err := NewWCF(testAddr)
+	if err != nil {
+		t.Fatalf("NewWCF() error = %v", err)
+	}
+	defer c.Close()
+
+	contacts := c.ExecDBQuery("MicroMsg.db", "select * from Contact;")
+	for _, contact := range contacts {
+		t.Log("contact:", contact)
+		parseContact(t, contact)
+	}
+}
+
+func parseContact(t *testing.T, contact *DbRow) {
+	t.Logf("-------------------- New Contact --------------------")
+	for _, field := range contact.Fields {
+		if field.Column == "ExtraBuf" && field.Type == 4 {
+			if extraBuf, err := parseExtraBuf(field.Content); err == nil {
+				t.Logf("%s: (ExtraBuf)", field.Column)
+				for k, v := range extraBuf {
+					t.Logf("  %s: %v", k, v)
+				}
+			} else {
+				t.Logf("%s: (ExtraBuf parse error) %v", field.Column, err)
+			}
+		} else {
+			// 其他非 ExtraBuf 字段，可以选择性打印
+			// t.Logf("%s: %v", field.Column, field.Content)
+		}
+	}
+}
+
+// parseExtraBuf 尝试解析 ExtraBuf 字段，只解析已知的几个字段
+func parseExtraBuf(extraBuf []byte) (map[string]interface{}, error) {
+	//extraBuf, err := hex.DecodeString(hexStr)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to decode hex string: %v", err)
+	//}
+
+	result := make(map[string]interface{})
+	buffer := bytes.NewBuffer(extraBuf)
+
+	for {
+		var dataType uint16
+		if err := binary.Read(buffer, binary.BigEndian, &dataType); err != nil {
+			if err.Error() == "EOF" {
+				break // End of buffer
+			}
+			return nil, fmt.Errorf("failed to read data type: %v", err)
+		}
+
+		var dataLength uint32
+		if err := binary.Read(buffer, binary.BigEndian, &dataLength); err != nil {
+			return nil, fmt.Errorf("failed to read data length: %v", err)
+		}
+
+		switch dataType {
+		case 0xED52: // verify_flag_extra
+			result["verify_flag_extra"] = binary.BigEndian.Uint32(buffer.Next(int(dataLength)))
+		case 0x1E22: // signature
+			result["signature"] = string(buffer.Next(int(dataLength)))
+		case 0xC67A: // city
+			result["city"] = string(buffer.Next(int(dataLength)))
+		case 0xD0E8: // province
+			result["province"] = string(buffer.Next(int(dataLength)))
+		case 0x1C90: // country
+			result["country"] = string(buffer.Next(int(dataLength)))
+		default:
+			// 对于未知的数据类型，跳过
+			buffer.Next(int(dataLength))
+		}
+	}
+
+	return result, nil
 }

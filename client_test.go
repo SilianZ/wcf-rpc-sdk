@@ -151,7 +151,7 @@ func TestClient_GetFriend(t *testing.T) {
 	defer client.Close()
 
 	// 假设 "filehelper" 是一个已知的好友
-	friend, err := client.GetFriend("wxid_jj4mhsji9tjk22")
+	friend, err := client.GetFriend("wxid_p5z4fuhnbdgs22")
 	if err != nil {
 		t.Fatalf("getFriend failed: %v", err)
 	}
@@ -233,4 +233,37 @@ func TestClient_ReplyText(t *testing.T) {
 			t.Error("回复消息错误", err)
 		}
 	}
+}
+
+func TestClient_GetMember(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	// 假设 "wxid_xxx" 是一个已知的成员
+	member, err := client.GetMember("wxid_qyutq6wnee2f22")
+	if err != nil {
+		t.Fatalf("getMember failed: %v", err)
+	}
+
+	t.Logf("Member Info: %#v", member)
+}
+
+func TestClient_GetAllMember(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(true, false, false)
+	defer client.Close()
+
+	members, err := client.GetAllMember()
+	if err != nil {
+		t.Fatalf("getAllMember failed: %v", err)
+	}
+
+	t.Log("members: ", members)
 }
