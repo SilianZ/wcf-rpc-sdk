@@ -18,18 +18,28 @@ var (
 
 type IMeta interface {
 	ReplyText(content string, ats ...string) error
+	IsSendByFriend() bool
 }
 
 // 用于回调
 type meta struct {
-	rawMsg   *Message
-	sender   string
-	sendText func(receiver string, content string, ats ...string) error
+	rawMsg *Message
+	sender string
+	cli    *Client
 }
 
 // ReplyText 回复文本
 func (m *meta) ReplyText(content string, ats ...string) error {
-	return m.sendText(m.sender, content, ats...)
+	return m.cli.SendText(m.sender, content, ats...)
+}
+
+// IsSendByFriend 是否好友发送的消息
+func (m *meta) IsSendByFriend() bool {
+	if m.rawMsg.IsSelf {
+		return false
+	}
+	friend, _ := m.cli.GetFriend(m.rawMsg.WxId)
+	return friend != nil
 }
 
 type Message struct {
@@ -56,6 +66,11 @@ type Message struct {
 // ReplyText 回复文本
 func (m *Message) ReplyText(content string, ats ...string) error {
 	return m.meta.ReplyText(content, ats...)
+}
+
+// IsSendByFriend 是否为好友的消息
+func (m *Message) IsSendByFriend() bool {
+	return m.meta.IsSendByFriend()
 }
 
 type MessageBuffer struct {

@@ -151,7 +151,7 @@ func TestClient_GetFriend(t *testing.T) {
 	defer client.Close()
 
 	// 假设 "filehelper" 是一个已知的好友
-	friend, err := client.GetFriend("wxid_p5z4fuhnbdgs22")
+	friend, err := client.GetFriend("wxid_pagpb98c6nj722")
 	if err != nil {
 		t.Fatalf("getFriend failed: %v", err)
 	}
@@ -235,6 +235,24 @@ func TestClient_ReplyText(t *testing.T) {
 			t.Error("回复消息错误", err)
 		}
 	}
+}
+
+func TestClient_IsSendByFriend(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10)
+
+	// 启动客户端
+	client.Run(false, false, false)
+	defer client.Close()
+
+	msg, err := client.GetMsg()
+	if err != nil {
+		t.Error("接收消息失败:", err.Error())
+	}
+	t.Logf("收到消息: %+v\n", msg)
+
+	isSendByFriend := msg.IsSendByFriend()
+	t.Logf("isFriend: %t", isSendByFriend)
 }
 
 func TestClient_GetMember(t *testing.T) {

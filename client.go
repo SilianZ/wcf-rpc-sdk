@@ -200,9 +200,9 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		sender = m.RoomId
 	}
 	metaData := &meta{ // meta用于让消息可以直接调用回复
-		rawMsg:   m,
-		sender:   sender,
-		sendText: cli.SendText,
+		rawMsg: m,
+		sender: sender,
+		cli:    cli,
 	}
 	m.meta = metaData
 	return m
@@ -265,7 +265,7 @@ func (c *Client) GetSelfInfo() *Self {
 
 // GetSelfName 获取机器人昵称
 func (c *Client) GetSelfName() string {
-	if c.self.Name == "" {
+	if c.self == nil || c.self.Name == "" {
 		c.GetSelfInfo() // 更新缓存
 	}
 	if c.self == nil {
@@ -329,7 +329,11 @@ func isNil(i interface{}) bool {
 func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(id string, isAll bool, t InfoType) (interface{}, error)) (interface{}, error) {
 	result, err := f(wxid, isAll, t)
 	if retry > 0 && isNil(result) {
-		c.updateCacheInfo()
+		if t == memberType || t == roomType {
+			c.updateCacheInfo(true, retry <= 0)
+		} else {
+			c.updateCacheInfo(false, retry <= 0)
+		}
 		return c.getInfo(wxid, isAll, t, retry-1, f)
 	}
 	return result, err
@@ -410,7 +414,7 @@ func (c *Client) GetAllMember() ([]*ContactInfo, error) {
 // 定时更新用户信息 <immediate 立即执行一次>
 func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
 	if immediate {
-		c.updateCacheInfo()
+		c.updateCacheInfo(true, true)
 	}
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -419,19 +423,21 @@ func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			c.updateCacheInfo() // 每分钟更新一次
+			c.updateCacheInfo(true, true) // 每分钟更新一次
 		}
 	}
 }
 
-// 更新缓存用户信息 <isAsync GetAllMember是否异步>
-func (c *Client) updateCacheInfo() {
+// 更新缓存用户信息 <isAsync GetAllMember是否异步> <是否输出错误日志>
+func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool) {
 	contacts := c.wxClient.GetContacts()
 	if len(contacts) == 0 {
 		logging.ErrorWithErr(ErrNull, "get contacts err")
 		return
 	}
-	c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
+	if IsGetMember {
+		c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
+	}
 	for _, contact := range contacts {
 		user := c.getUser(contact)
 		if user == nil {
@@ -446,18 +452,25 @@ func (c *Client) updateCacheInfo() {
 			v.RoomID = v.Wxid
 			roomMemberIds, err := c.GetRoomMemberID(v.RoomID)
 			if err != nil {
-				logging.WarnWithErr(err, "get room member id err")
+				if isLogErr {
+					logging.WarnWithErr(err, "get room member id err")
+				}
 			} else {
 				members, err := c.cacheUser.GetMemberByList(roomMemberIds...)
 				if err != nil {
-					logging.WarnWithErr(err, "get room member err")
+					if isLogErr {
+						logging.WarnWithErr(err, "get room member err")
+					}
 				} else {
 					v.RoomData = &RoomData{Members: members}
 				}
 			}
 			room, err := c.cacheUser.GetMember(v.RoomID)
 			if err != nil {
-				logging.WarnWithErr(err, "get room err")
+				if isLogErr {
+					logging.WarnWithErr(err, "get room err")
+				}
+
 			} else {
 				v.RoomHeadImgURL = &room.SmallHeadURL
 				//todo 公告字段 v.RoomAnnouncement
