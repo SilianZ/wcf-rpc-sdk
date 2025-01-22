@@ -161,14 +161,14 @@ type RoomData struct {
 }
 
 func (rd *RoomData) GetMembers(wxidList ...string) ([]*ContactInfo, error) {
-	var contactInfoList = make([]*ContactInfo, 0, len(rd.Members))
+	var contactInfoList = make([]*ContactInfo, len(rd.Members))
 	if wxidList == nil || len(wxidList) == 0 {
 		return nil, ErrNull
 	}
-	for _, w := range wxidList {
+	for i, w := range wxidList {
 		for _, member := range rd.Members {
 			if member.Wxid == w {
-				contactInfoList = append(contactInfoList, member)
+				contactInfoList[i] = member
 			}
 		}
 	}
@@ -180,14 +180,14 @@ func (rd *RoomData) GetMembers(wxidList ...string) ([]*ContactInfo, error) {
 }
 
 func (rd *RoomData) GetMembersNickNameById(wxidList ...string) ([]string, error) {
-	var nicknameList = make([]string, 0, len(wxidList))
+	var nicknameList = make([]string, len(wxidList))
 	if len(wxidList) == 0 {
 		return nil, ErrNull
 	}
-	for _, wxid := range wxidList {
+	for i, wxid := range wxidList {
 		for _, member := range rd.Members {
 			if member.Wxid == wxid {
-				nicknameList = append(nicknameList, member.NickName)
+				nicknameList[i] = member.NickName
 				break // 找到一个匹配的 wxid 就跳出内层循环
 			}
 		}
@@ -199,14 +199,14 @@ func (rd *RoomData) GetMembersNickNameById(wxidList ...string) ([]string, error)
 }
 
 func (rd *RoomData) GetMembersByNickName(nicknameList ...string) ([]*ContactInfo, error) {
-	var contactInfoList = make([]*ContactInfo, 0, len(nicknameList))
+	var contactInfoList = make([]*ContactInfo, len(nicknameList))
 	if len(nicknameList) == 0 {
 		return nil, ErrNull
 	}
-	for _, nickname := range nicknameList {
+	for i, nickname := range nicknameList {
 		for _, member := range rd.Members {
 			if member.NickName == nickname {
-				contactInfoList = append(contactInfoList, member)
+				contactInfoList[i] = member
 			}
 		}
 	}
