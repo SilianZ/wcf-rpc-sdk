@@ -110,8 +110,8 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)
 		}
 	}()
-	go c.cyclicUpdateSelfInfo() // 启动定时更新
-	go c.cyclicUpdateCacheInfo()
+	go c.cyclicUpdateSelfInfo(true)  // 启动定时更新
+	go c.cyclicUpdateCacheInfo(true) // 启动定时更新
 }
 
 func (c *Client) IsLogin() bool {
@@ -165,20 +165,21 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		logging.ErrorWithErr(ErrNull, "internal msg is nil")
 		return nil
 	}
-	var contactInfos []*ContactInfo
-	if !msg.IsGroup { // 不是群组消息
-		msg.Roomid = "" // 置空
-	} else {
-		roomMemberIds, err := cli.GetRoomMember(msg.Roomid)
+	var roomMembers []*ContactInfo
+	if msg.IsGroup { // 群聊消息
+		roomMemberIds, err := cli.GetRoomMemberID(msg.Roomid)
 		if err != nil {
-			logging.ErrorWithErr(err, "GetRoomMember")
+			logging.ErrorWithErr(err, "GetRoomMemberID")
 		} else {
-			contactInfos, err = cli.GetMember(roomMemberIds...)
+			roomMembers, err = cli.GetMember(roomMemberIds...)
 			if err != nil {
 				logging.ErrorWithErr(err, "GetMember")
 			}
 		}
+	} else { // 不是群组消息
+		msg.Roomid = "" // 置空
 	}
+
 	m := &Message{
 		IsSelf:    msg.IsSelf,
 		IsGroup:   msg.IsGroup,
@@ -186,7 +187,7 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		Type:      msg.Type,
 		Ts:        msg.Ts,
 		RoomId:    msg.Roomid,
-		RoomData:  &RoomData{Members: contactInfos},
+		RoomData:  &RoomData{Members: roomMembers},
 		Content:   msg.Content,
 		WxId:      msg.Sender,
 		Sign:      msg.Sign,
@@ -220,20 +221,20 @@ func (c *Client) SendText(receiver string, content string, ats ...string) error 
 	return nil
 }
 
-// GetRoomMember 获取群成员信息，返回解码后的字符串以及 wxid 列表
-func (c *Client) GetRoomMember(roomId string) ([]string, error) {
+// GetRoomMemberID 获取群成员信息，返回解码后的字符串以及 wxid 列表
+func (c *Client) GetRoomMemberID(roomId string) ([]string, error) {
 	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
-	logging.Debug("GetRoomMember", map[string]interface{}{"roomId": roomId, "contacts": contacts})
+	logging.Debug("GetRoomMemberID", map[string]interface{}{"roomId": roomId, "contacts": contacts})
 
 	if len(contacts) == 0 || len(contacts[0].GetFields()) == 0 {
 		return nil, fmt.Errorf("no room data found for roomId: %s", roomId)
 	}
 
 	decodedString := string(contacts[0].GetFields()[0].Content)
-	logging.Debug("GetRoomMember", map[string]interface{}{"roomId": roomId, "decodedString": decodedString}) // 打印解码后的字符串
+	logging.Debug("GetRoomMemberID", map[string]interface{}{"roomId": roomId, "decodedString": decodedString}) // 打印解码后的字符串
 
 	// 使用正则表达式提取 wxid
-	re := regexp.MustCompile(`\n\x19\n\x13(wxid_[a-zA-Z0-9]+)\x12\x00\x18`)
+	re := regexp.MustCompile(`(wxid_[a-zA-Z0-9]+)`)
 	matches := re.FindAllStringSubmatch(decodedString, -1)
 
 	var wxids []string
@@ -284,8 +285,11 @@ func (c *Client) GetSelfWxId() string {
 	return c.self.Wxid
 }
 
-// cyclicUpdateSelfInfo 定时更新机器人信息
-func (c *Client) cyclicUpdateSelfInfo() {
+// cyclicUpdateSelfInfo 定时更新机器人信息 <immediate 立即执行一次>
+func (c *Client) cyclicUpdateSelfInfo(immediate bool) {
+	if immediate {
+		c.GetSelfInfo()
+	}
 	ticker := time.NewTicker(time.Minute * 2)
 	defer ticker.Stop()
 	for {
@@ -325,7 +329,7 @@ func isNil(i interface{}) bool {
 func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(id string, isAll bool, t InfoType) (interface{}, error)) (interface{}, error) {
 	result, err := f(wxid, isAll, t)
 	if retry > 0 && isNil(result) {
-		c.updateCacheInfo(false) // 不异步更新
+		c.updateCacheInfo()
 		return c.getInfo(wxid, isAll, t, retry-1, f)
 	}
 	return result, err
@@ -364,7 +368,7 @@ func (c *Client) GetChatRoom(roomId string) (*ChatRoom, error) {
 	return res, nil
 }
 
-// GetAllChatRoom 获取所有群组信息 todo 完善ChatRoom字段
+// GetAllChatRoom 获取所有群组信息
 func (c *Client) GetAllChatRoom() (*ChatRoomList, error) {
 	info, err := c.getInfo("", true, roomType, 3, c.cacheUser.Get)
 	if err != nil {
@@ -403,8 +407,11 @@ func (c *Client) GetAllMember() ([]*ContactInfo, error) {
 	return res, nil
 }
 
-// 定时更新用户信息
-func (c *Client) cyclicUpdateCacheInfo() {
+// 定时更新用户信息 <immediate 立即执行一次>
+func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
+	if immediate {
+		c.updateCacheInfo()
+	}
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
@@ -412,26 +419,19 @@ func (c *Client) cyclicUpdateCacheInfo() {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			c.updateCacheInfo(true) // 每分钟更新一次
+			c.updateCacheInfo() // 每分钟更新一次
 		}
 	}
 }
 
 // 更新缓存用户信息 <isAsync GetAllMember是否异步>
-func (c *Client) updateCacheInfo(isAsync bool) {
+func (c *Client) updateCacheInfo() {
 	contacts := c.wxClient.GetContacts()
 	if len(contacts) == 0 {
 		logging.ErrorWithErr(ErrNull, "get contacts err")
 		return
 	}
-	waitSignal := make(chan struct{}, 1)
-	go func() { // 异步
-		c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
-		close(waitSignal)                           // 放行
-	}()
-	if !isAsync {
-		<-waitSignal // 等待执行完联系人的
-	}
+	c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
 	for _, contact := range contacts {
 		user := c.getUser(contact)
 		if user == nil {
@@ -441,8 +441,27 @@ func (c *Client) updateCacheInfo(isAsync bool) {
 		case Friend:
 			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "friend": v})
 			c.cacheUser.updateFriend(&v)
-		case ChatRoom:
+		case ChatRoom: // todo 完善chatRoom字段
 			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "chatroom": v})
+			v.RoomID = v.Wxid
+			roomMemberIds, err := c.GetRoomMemberID(v.RoomID)
+			if err != nil {
+				logging.WarnWithErr(err, "get room member id err")
+			} else {
+				members, err := c.cacheUser.GetMemberByList(roomMemberIds...)
+				if err != nil {
+					logging.WarnWithErr(err, "get room member err")
+				} else {
+					v.RoomData = &RoomData{Members: members}
+				}
+			}
+			room, err := c.cacheUser.GetMember(v.RoomID)
+			if err != nil {
+				logging.WarnWithErr(err, "get room err")
+			} else {
+				v.RoomHeadImgURL = &room.SmallHeadURL
+				//todo 公告字段 v.RoomAnnouncement
+			}
 			c.cacheUser.updateChatRoom(&v)
 		case GH:
 			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "gh": v})
@@ -504,8 +523,6 @@ func (c *Client) getAllMember() *[]*ContactInfo {
 				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
 					cInfo.DelFlag = uint8(num)
 				} else {
-					// 处理错误，例如记录日志或设置默认值
-					// t.Logf("Error parsing DelFlag: %v", err)
 					logging.WarnWithErr(err, "error parsing DelFlag")
 					cInfo.DelFlag = 0 // todo 或者其他默认值
 				}

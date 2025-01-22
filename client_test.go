@@ -88,7 +88,7 @@ func TestClient_GetContacts(t *testing.T) {
 
 }
 
-func TestClient_GetRoomMember(t *testing.T) {
+func TestClient_GetRoomMemberID(t *testing.T) {
 	// 创建客户端实例
 	client := NewClient(10)
 
@@ -97,9 +97,9 @@ func TestClient_GetRoomMember(t *testing.T) {
 	defer client.Close()
 
 	roomId := "45959390469@chatroom"
-	wxids, err := client.GetRoomMember(roomId)
+	wxids, err := client.GetRoomMemberID(roomId)
 	if err != nil {
-		t.Fatalf("GetRoomMember failed: %v", err)
+		t.Fatalf("GetRoomMemberID failed: %v", err)
 	}
 
 	// 打印解码后的字符串
@@ -182,7 +182,7 @@ func TestClient_GetChatRoom(t *testing.T) {
 	client := NewClient(10)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(false, false, false)
 	defer client.Close()
 
 	// 假设 "45959390469@chatroom" 是一个已知的群聊
@@ -191,7 +191,9 @@ func TestClient_GetChatRoom(t *testing.T) {
 		t.Fatalf("getChatRoom failed: %v", err)
 	}
 
-	t.Logf("ChatRoom Info: %#v", chatroom)
+	t.Logf("ChatRoom Info: %#v", *chatroom)
+	t.Logf("ChatRoom RoomData: %#v", *chatroom.RoomData)
+	t.Logf("ChatRoom RoomHeadImgURL: %#v", *chatroom.RoomHeadImgURL)
 }
 
 func TestClient_GetAllChatRoom(t *testing.T) {
@@ -240,16 +242,18 @@ func TestClient_GetMember(t *testing.T) {
 	client := NewClient(10)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(false, false, false)
 	defer client.Close()
 
 	// 假设 "wxid_xxx" 是一个已知的成员
-	member, err := client.GetMember("wxid_qyutq6wnee2f22")
+	memberList, err := client.GetMember("45959390469@chatroom") // 45959390469@chatroom wxid_qyutq6wnee2f22
 	if err != nil {
 		t.Fatalf("getMember failed: %v", err)
 	}
 
-	t.Logf("Member Info: %#v", member)
+	for _, member := range memberList {
+		t.Logf("Member Info: %#v", member)
+	}
 }
 
 func TestClient_GetAllMember(t *testing.T) {

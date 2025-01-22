@@ -93,10 +93,10 @@ func (cm *CacheUserManager) getChatRoom(chatRoomId string) (*ChatRoom, error) {
 
 // updateChatRoom 更新群组信息
 func (cm *CacheUserManager) updateChatRoom(chatRoom *ChatRoom) {
-	if _, ok := cm.roomCache.Load(chatRoom.Wxid); !ok {
+	if _, ok := cm.roomCache.Load(chatRoom.RoomID); !ok {
 		cm.roomCount++
 	}
-	cm.roomCache.Store(chatRoom.Wxid, chatRoom)
+	cm.roomCache.Store(chatRoom.RoomID, chatRoom)
 }
 
 // getAllFriend 获取全部好友
@@ -128,6 +128,22 @@ func (cm *CacheUserManager) GetMember(wxId string) (*ContactInfo, error) {
 		return nil, fmt.Errorf("contact not found: %s", wxId)
 	}
 	return value.(*ContactInfo), nil
+}
+
+// GetMemberByList 通过多个wxid 获取联系人列表（包括群聊陌生群成员）
+func (cm *CacheUserManager) GetMemberByList(wxIdList ...string) ([]*ContactInfo, error) {
+	var list = make([]*ContactInfo, 0, len(wxIdList))
+	for _, wxId := range wxIdList {
+		value, ok := cm.memberCache.Load(wxId)
+		if !ok {
+			continue
+		}
+		list = append(list, value.(*ContactInfo))
+	}
+	if len(list) == 0 {
+		return nil, fmt.Errorf("contact not found: %s", wxIdList)
+	}
+	return list, nil
 }
 
 // GetAllMember 获取全部联系人（包括群聊陌生群成员）
