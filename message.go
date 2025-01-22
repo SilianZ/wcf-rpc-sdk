@@ -160,6 +160,62 @@ type RoomData struct {
 	Members []*ContactInfo `json:"members,omitempty"` // 成员列表
 }
 
+func (rd *RoomData) GetMembers(wxidList ...string) ([]*ContactInfo, error) {
+	var contactInfoList = make([]*ContactInfo, 0, len(rd.Members))
+	if wxidList == nil || len(wxidList) == 0 {
+		return nil, ErrNull
+	}
+	for _, w := range wxidList {
+		for _, member := range rd.Members {
+			if member.Wxid == w {
+				contactInfoList = append(contactInfoList, member)
+			}
+		}
+	}
+	if len(contactInfoList) == 0 {
+		return nil, ErrNull
+	}
+
+	return contactInfoList, nil
+}
+
+func (rd *RoomData) GetMembersNickNameById(wxidList ...string) ([]string, error) {
+	var nicknameList = make([]string, 0, len(wxidList))
+	if len(wxidList) == 0 {
+		return nil, ErrNull
+	}
+	for _, wxid := range wxidList {
+		for _, member := range rd.Members {
+			if member.Wxid == wxid {
+				nicknameList = append(nicknameList, member.NickName)
+				break // 找到一个匹配的 wxid 就跳出内层循环
+			}
+		}
+	}
+	if len(nicknameList) == 0 {
+		return nil, ErrNull
+	}
+	return nicknameList, nil
+}
+
+func (rd *RoomData) GetMembersByNickName(nicknameList ...string) ([]*ContactInfo, error) {
+	var contactInfoList = make([]*ContactInfo, 0, len(nicknameList))
+	if len(nicknameList) == 0 {
+		return nil, ErrNull
+	}
+	for _, nickname := range nicknameList {
+		for _, member := range rd.Members {
+			if member.NickName == nickname {
+				contactInfoList = append(contactInfoList, member)
+			}
+		}
+	}
+	if len(contactInfoList) == 0 {
+		return nil, ErrNull
+	}
+	return contactInfoList, nil
+}
+
 type ContactInfo struct {
 	// 微信ID
 	Wxid string `json:"wxid"`
