@@ -77,6 +77,8 @@ func NewClient(msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 		<-syncSignal
 	}
 	close(syncSignal) // 关闭同步
+	logging.Warn("30s后启动wcf客户端，请确保登录微信")
+	time.Sleep(30 * time.Second)
 	wxclient, err := wcf.NewWCF(addr)
 	if err != nil {
 		logging.Fatal(fmt.Errorf("new wcf err: %w", err).Error(), 1001)

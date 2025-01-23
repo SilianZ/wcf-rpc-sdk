@@ -81,10 +81,10 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 	if err != nil {
 		logging.ErrorWithErr(err, "Failed to load dll", map[string]interface{}{"hint": "请检查目录下是否放置sdk.dll & spy.dll & spy_debug.dll"})
 		// 尝试下载并重试
-		if downloadAndRetry(ctx, port, debug, syncChan) {
-			return
+		if !downloadAndRetry() {
+			logging.Fatal("inject failed!", -1000)
 		}
-		logging.Fatal("inject failed!", -1000)
+		return
 	}
 
 	logging.Info("### Inject SDK into WeChat ###")
@@ -97,30 +97,33 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 			logging.Info("Injection process cancelled.")
 			return
 		default:
-			if func() bool {
-				defer func() {
-					if r := recover(); r != nil { // 注入失败时反复重试
-						logging.Error(fmt.Sprintf("Get panic: %v, Wait for retry...", r))
-						time.Sleep(3 * time.Second)
-					}
-				}()
-				callFunc(funcInject, "Inject SDK...", debug, port)
-				return true
-			}() {
-				goto InjectSuccess
+			if tryInject(debug, port) {
+				syncChan <- struct{}{} // 注入成功通知
+				logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
+				waitingSignal(ctx)
+				callFunc(funcDestroy, "SDK destroy", debug, port)
+				_ = gblDll.Release()
+				return
 			}
 		}
 	}
-InjectSuccess:
-	syncChan <- struct{}{} // 注入成功通知
-	logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
-	waitingSignal(ctx)
-	callFunc(funcDestroy, "SDK destroy", debug, port)
-	_ = gblDll.Release()
+}
+
+// 尝试注入
+func tryInject(debug bool, port int) (success bool) {
+	defer func() {
+		if r := recover(); r != nil { // 注入失败时反复重试
+			logging.Error(fmt.Sprintf("Get panic: %v, Wait for retry...", r))
+			time.Sleep(3 * time.Second)
+			success = false
+		}
+	}()
+	callFunc(funcInject, "Inject SDK...", debug, port)
+	return true
 }
 
 // 下载所需 DLL 文件并重试注入
-func downloadAndRetry(ctx context.Context, port int, debug bool, syncChan chan struct{}) bool {
+func downloadAndRetry() bool {
 	dlls := []string{"sdk.dll", "spy.dll", "spy_debug.dll"}
 	// 使用 raw.githubusercontent.com 的地址
 	baseUrl := "https://raw.githubusercontent.com/Clov614/wcf-rpc-sdk/main/sources/sdk/"
@@ -137,39 +140,8 @@ func downloadAndRetry(ctx context.Context, port int, debug bool, syncChan chan s
 	}
 
 	// 重试注入
-	logging.Info("Retrying injection...")
-	gblDll, err := syscall.LoadDLL(libSdk)
-	if err != nil {
-		logging.ErrorWithErr(err, "Failed to load dll after download", nil)
-		return false
-	}
-
-	startAt := time.Now()
-	for {
-		select {
-		case <-ctx.Done():
-			logging.Info("Injection process cancelled during retry.")
-			return true
-		default:
-			if func() bool {
-				defer func() {
-					if r := recover(); r != nil {
-						logging.Error(fmt.Sprintf("Get panic during retry: %v, Wait for retry...", r))
-						time.Sleep(3 * time.Second)
-					}
-				}()
-				callFunc(funcInject, "Inject SDK (retry)...", debug, port)
-				return true
-			}() {
-				syncChan <- struct{}{}
-				logging.Info(fmt.Sprintf("SDK inject success after retry. Time used: %f", time.Now().Sub(startAt).Seconds()))
-				waitingSignal(ctx)
-				callFunc(funcDestroy, "SDK destroy", debug, port)
-				_ = gblDll.Release()
-				return true
-			}
-		}
-	}
+	logging.Fatal("已远程拉取.dll文件，请检查dll是否存在，重启程序", 0001)
+	return false
 }
 
 // 下载文件的辅助函数
