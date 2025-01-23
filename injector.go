@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/Clov614/logging"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -78,6 +80,10 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 	gblDll, err = syscall.LoadDLL(libSdk)
 	if err != nil {
 		logging.ErrorWithErr(err, "Failed to load dll", map[string]interface{}{"hint": "请检查目录下是否放置sdk.dll & spy.dll & spy_debug.dll"})
+		// 尝试下载并重试
+		if downloadAndRetry(ctx, port, debug, syncChan) {
+			return
+		}
 		logging.Fatal("inject failed!", -1000)
 	}
 
@@ -111,4 +117,78 @@ InjectSuccess:
 	waitingSignal(ctx)
 	callFunc(funcDestroy, "SDK destroy", debug, port)
 	_ = gblDll.Release()
+}
+
+// 下载所需 DLL 文件并重试注入
+func downloadAndRetry(ctx context.Context, port int, debug bool, syncChan chan struct{}) bool {
+	dlls := []string{"sdk.dll", "spy.dll", "spy_debug.dll"}
+	// 使用 raw.githubusercontent.com 的地址
+	baseUrl := "https://raw.githubusercontent.com/Clov614/wcf-rpc-sdk/main/sources/sdk/"
+
+	for _, dll := range dlls {
+		url := baseUrl + dll
+		logging.Info(fmt.Sprintf("Downloading %s from %s", dll, url))
+		err := downloadFile(dll, url)
+		if err != nil {
+			logging.ErrorWithErr(err, fmt.Sprintf("Failed to download %s", dll), nil)
+			return false
+		}
+		logging.Info(fmt.Sprintf("Successfully downloaded %s", dll))
+	}
+
+	// 重试注入
+	logging.Info("Retrying injection...")
+	gblDll, err := syscall.LoadDLL(libSdk)
+	if err != nil {
+		logging.ErrorWithErr(err, "Failed to load dll after download", nil)
+		return false
+	}
+
+	startAt := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			logging.Info("Injection process cancelled during retry.")
+			return true
+		default:
+			if func() bool {
+				defer func() {
+					if r := recover(); r != nil {
+						logging.Error(fmt.Sprintf("Get panic during retry: %v, Wait for retry...", r))
+						time.Sleep(3 * time.Second)
+					}
+				}()
+				callFunc(funcInject, "Inject SDK (retry)...", debug, port)
+				return true
+			}() {
+				syncChan <- struct{}{}
+				logging.Info(fmt.Sprintf("SDK inject success after retry. Time used: %f", time.Now().Sub(startAt).Seconds()))
+				waitingSignal(ctx)
+				callFunc(funcDestroy, "SDK destroy", debug, port)
+				_ = gblDll.Release()
+				return true
+			}
+		}
+	}
+}
+
+// 下载文件的辅助函数
+func downloadFile(filepath string, url string) error {
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
 }
