@@ -70,6 +70,8 @@ func waitingSignal(ctx context.Context) {
 }
 
 func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
+	logging.Warn("自动注入中...", map[string]interface{}{"hint": "请检查是否安装对应微信3.9.11.25版本，如未安装请前往地址下载&安装", "wechatSetUpUrl": "https://github.com/lich0821/WeChatFerry/releases/download/v39.3.5/WeChatSetup-3.9.11.25.exe"})
+	logging.Info("debug 模式状态", map[string]interface{}{"debug": debug})
 	// 加载调用库
 	log("Load dll:", libSdk)
 	var err error
@@ -92,7 +94,7 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 			if func() bool {
 				defer func() {
 					if r := recover(); r != nil { // 注入失败时反复重试
-						logging.Warn(fmt.Sprintf("Get panic: %v, Wait for retry...", r))
+						logging.Error(fmt.Sprintf("Get panic: %v, Wait for retry...", r))
 						time.Sleep(3 * time.Second)
 					}
 				}()
