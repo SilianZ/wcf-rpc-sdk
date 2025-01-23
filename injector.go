@@ -69,7 +69,7 @@ func waitingSignal(ctx context.Context) {
 	logging.Info("Stopped!")
 }
 
-func Inject(ctx context.Context, port int, debug bool) {
+func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 	// 加载调用库
 	log("Load dll:", libSdk)
 	var err error
@@ -104,6 +104,7 @@ func Inject(ctx context.Context, port int, debug bool) {
 		}
 	}
 InjectSuccess:
+	syncChan <- struct{}{} // 注入成功通知
 	logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
 	waitingSignal(ctx)
 	callFunc(funcDestroy, "SDK destroy", debug, port)

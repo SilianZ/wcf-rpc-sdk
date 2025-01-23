@@ -13,12 +13,10 @@ import (
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -58,13 +56,31 @@ func (c *Client) Close() {
 	}
 }
 
-func NewClient(msgChanSize int) *Client {
+// NewClient <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
+func NewClient(msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 	addr := env.Name(ENVTcpAddr).StringOrElse(DefaultTcpAddr) // "tcp://127.0.0.1:10086"
 	ctx, cancel := context.WithCancel(context.Background())
+	var syncSignal = make(chan struct{}) // 同步信号 确保注入后处理消息
+	if autoInject {                      // 自动注入
+		port, err := strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
+		if err != nil {
+			logging.ErrorWithErr(err, "the port is invalid, please check your address")
+			logging.Fatal("canot auto inject!", 1000, map[string]interface{}{"port": port})
+		}
+
+		go func() {
+			Inject(ctx, port, sdkDebug, syncSignal) // 调用sdk.dll 注入&启动微信
+		}()
+
+	}
+	if autoInject { // todo test 待测试
+		<-syncSignal
+	}
+	close(syncSignal) // 关闭同步
 	wxclient, err := wcf.NewWCF(addr)
 	if err != nil {
 		logging.Fatal(fmt.Errorf("new wcf err: %w", err).Error(), 1001)
-		panic(err)
+		//panic(err)
 	}
 	return &Client{
 		ctx:       ctx,
@@ -76,8 +92,8 @@ func NewClient(msgChanSize int) *Client {
 	}
 }
 
-// Run 运行tcp监听 以及 请求tcp监听信息 <是否debug> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
-func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
+// Run 运行tcp监听 以及 请求tcp监听信息 <是否debug>
+func (c *Client) Run(debug bool) {
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		logging.Debug("Debug mode enabled")
@@ -86,25 +102,7 @@ func (c *Client) Run(debug bool, autoInject bool, sdkDebug bool) {
 	}
 	// 增加项目字段
 	logging.SetField(map[string]interface{}{"sdk": "wcf-rpc-sdk"})
-	var syncSignal = make(chan os.Signal, 1) // 同步信号 确保注入后处理消息
-	if autoInject {                          // 自动注入
-		port, err := strconv.Atoi(c.addr[strings.LastIndex(c.addr, ":")+1:])
-		if err != nil {
-			logging.ErrorWithErr(err, "the port is invalid, please check your address")
-			logging.Fatal("canot auto inject!", 1000, map[string]interface{}{"port": port})
-		}
-
-		go func() {
-			Inject(c.ctx, port, sdkDebug) // 调用sdk.dll 注入&启动微信
-			syncSignal <- syscall.SIGINT
-		}()
-
-	}
-	if autoInject { // todo test 待测试
-		<-syncSignal
-	}
-	close(syncSignal) // 关闭同步
-	go func() {       // 处理接收消息
+	go func() { // 处理接收消息
 		err := c.handleMsg(c.ctx)
 		if err != nil {
 			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)

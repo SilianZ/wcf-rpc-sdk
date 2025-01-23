@@ -8,10 +8,10 @@ import (
 // TestClient_Recv 持续接收消息
 func TestClient_Recv(t *testing.T) {
 	// 创建客户端实例
-	cli := NewClient(10)
+	cli := NewClient(10, true, false)
 
 	// 启动客户端，这里假设不需要自动注入微信
-	cli.Run(false, false, false)
+	cli.Run(false)
 	// 关闭客户端
 	defer cli.Close()
 	for msg := range cli.GetMsgChan() {
@@ -21,10 +21,10 @@ func TestClient_Recv(t *testing.T) {
 
 func TestClient_SendTextAndGetMsg(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端，这里假设不需要自动注入微信
-	client.Run(false, false, false)
+	client.Run(false)
 	// 关闭客户端
 	defer client.Close()
 	// 等待客户端连接
@@ -51,10 +51,10 @@ func TestClient_SendTextAndGetMsg(t *testing.T) {
 
 func TestClient_SendGroupTextAndAt(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	// 测试 SendText At
@@ -69,11 +69,11 @@ func TestClient_SendGroupTextAndAt(t *testing.T) {
 
 func TestClient_GetContacts(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 	defer client.Close()
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 
 	// 测试 GetContacts
 	contacts := client.wxClient.GetContacts()
@@ -90,10 +90,10 @@ func TestClient_GetContacts(t *testing.T) {
 
 func TestClient_GetRoomMemberID(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(true)
 	defer client.Close()
 
 	roomId := "45959390469@chatroom"
@@ -108,10 +108,10 @@ func TestClient_GetRoomMemberID(t *testing.T) {
 
 func TestClient_GetSelfInfo(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(true)
 	defer client.Close()
 
 	info := client.GetSelfInfo()
@@ -120,10 +120,10 @@ func TestClient_GetSelfInfo(t *testing.T) {
 
 func TestClient_GetSelfName(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	name := client.GetSelfName()
@@ -132,10 +132,10 @@ func TestClient_GetSelfName(t *testing.T) {
 
 func TestClient_GetSelfWxId(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	wxid := client.GetSelfWxId()
@@ -144,10 +144,10 @@ func TestClient_GetSelfWxId(t *testing.T) {
 
 func TestClient_GetFriend(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	// 假设 "filehelper" 是一个已知的好友
@@ -161,10 +161,10 @@ func TestClient_GetFriend(t *testing.T) {
 
 func TestClient_GetAllFriend(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(true)
 	defer client.Close()
 
 	friends, err := client.GetAllFriend()
@@ -179,10 +179,10 @@ func TestClient_GetAllFriend(t *testing.T) {
 
 func TestClient_GetChatRoom(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	// 假设 "45959390469@chatroom" 是一个已知的群聊
@@ -198,10 +198,10 @@ func TestClient_GetChatRoom(t *testing.T) {
 
 func TestClient_GetAllChatRoom(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(true)
 	defer client.Close()
 
 	chatrooms, err := client.GetAllChatRoom()
@@ -216,10 +216,10 @@ func TestClient_GetAllChatRoom(t *testing.T) {
 
 func TestClient_ReplyText(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(true)
 	defer client.Close()
 
 	msg, err := client.GetMsg()
@@ -239,10 +239,10 @@ func TestClient_ReplyText(t *testing.T) {
 
 func TestClient_IsSendByFriend(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	msg, err := client.GetMsg()
@@ -257,10 +257,10 @@ func TestClient_IsSendByFriend(t *testing.T) {
 
 func TestClient_GetMember(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false, false, false)
+	client.Run(false)
 	defer client.Close()
 
 	// 假设 "wxid_xxx" 是一个已知的成员
@@ -276,10 +276,10 @@ func TestClient_GetMember(t *testing.T) {
 
 func TestClient_GetAllMember(t *testing.T) {
 	// 创建客户端实例
-	client := NewClient(10)
+	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(true, false, false)
+	client.Run(true)
 	defer client.Close()
 
 	members, err := client.GetAllMember()
