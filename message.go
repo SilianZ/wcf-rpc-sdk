@@ -47,7 +47,7 @@ type Message struct {
 	IsSelf    bool              `json:"is_self,omitempty"`
 	IsGroup   bool              `json:"is_group,omitempty"`
 	MessageId uint64            `json:"message_id,omitempty"`
-	Type      uint32            `json:"type,omitempty"`
+	Type      MsgType           `json:"type,omitempty"`
 	Ts        uint32            `json:"ts,omitempty"`
 	RoomId    string            `json:"room_id,omitempty"`
 	RoomData  *RoomData         `json:"room_data,omitempty"`
@@ -57,7 +57,8 @@ type Message struct {
 	Thumb     string            `json:"thumb,omitempty"`
 	Extra     string            `json:"extra,omitempty"`
 	Xml       string            `json:"xml,omitempty"`
-	FileInfo  *manager.FileInfo `json:"-"` // 图片保存信息
+	FileInfo  *manager.FileInfo `json:"-"`               // 图片保存信息
+	Quote     *QuoteMsg         `json:"quote,omitempty"` // 引用消息
 
 	//UserInfo *UserInfo `json:"user_info,omitempty"` todo
 	//Contacts *Contacts `json:"contact,omitempty"`
@@ -248,38 +249,43 @@ type GH User // todo 公众号
 type MsgType int
 
 const (
-	MsgTypeMoments           MsgType = iota // 朋友圈消息
-	MsgTypeText                             // 文字
-	MsgTypeImage                            // 图片
-	MsgTypeVoice                            // 语音
-	MsgTypeFriendConfirm                    // 好友确认
-	MsgTypePossibleFriend                   // POSSIBLEFRIEND_MSG
-	MsgTypeBusinessCard                     // 名片
-	MsgTypeVideo                            // 视频
-	MsgTypeRockPaperScissors                // 石头剪刀布 | 表情图片
-	MsgTypeLocation                         // 位置
-	MsgTypeShare                            // 共享实时位置、文件、转账、链接
-	MsgTypeVoip                             // VOIPMSG
-	MsgTypeWechatInit                       // 微信初始化
-	MsgTypeVoipNotify                       // VOIPNOTIFY
-	MsgTypeVoipInvite                       // VOIPINVITE
-	MsgTypeShortVideo                       // 小视频
-	MsgTypeRedPacket                        // 微信红包
-	MsgTypeSysNotice                        // SYSNOTICE
-	MsgTypeSystem                           // 红包、系统消息
-	MsgTypeRevoke                           // 撤回消息
-	MsgTypeSogouEmoji                       // 搜狗表情
-	MsgTypeLink                             // 链接
-	MsgTypeWechatRedPacket                  // 微信红包
-	MsgTypeRedPacketCover                   // 红包封面
-	MsgTypeVideoChannelVideo                // 视频号视频
-	MsgTypeVideoChannelCard                 // 视频号名片
-	MsgTypeQuote                            // 引用消息
-	MsgTypePat                              // 拍一拍
-	MsgTypeVideoChannelLive                 // 视频号直播
-	MsgTypeProductLink                      // 商品链接
-	MsgTypeMusicLink                        // 音乐链接
-	MsgTypeFile                             // 文件
+	MsgTypeMoments           MsgType = 0       // 朋友圈消息
+	MsgTypeText              MsgType = 1       // 文字
+	MsgTypeImage             MsgType = 3       // 图片
+	MsgTypeVoice             MsgType = 34      // 语音
+	MsgTypeFriendConfirm     MsgType = 37      // 好友确认
+	MsgTypePossibleFriend    MsgType = 40      // POSSIBLEFRIEND_MSG
+	MsgTypeBusinessCard      MsgType = 42      // 名片
+	MsgTypeVideo             MsgType = 43      // 视频
+	MsgTypeRockPaperScissors MsgType = 47      // 石头剪刀布 | 表情图片
+	MsgTypeLocation          MsgType = 48      // 位置
+	MsgTypeXML               MsgType = 49      // 共享实时位置、文件、转账、链接、应用消息
+	MsgTypeXMLQuote          MsgType = 4901    // 引用消息
+	MsgTypeXMLImage          MsgType = 4903    // XML 中的图片消息
+	MsgTypeXMLFile           MsgType = 4906    // XML 中的文件消息
+	MsgTypeXMLLink           MsgType = 4916    // XML 中的链接消息
+	MsgTypeVoip              MsgType = 50      // VOIPMSG
+	MsgTypeWechatInit        MsgType = 51      // 微信初始化
+	MsgTypeVoipNotify        MsgType = 52      // VOIPNOTIFY
+	MsgTypeVoipInvite        MsgType = 53      // VOIPINVITE
+	MsgTypeShortVideo        MsgType = 62      // 小视频
+	MsgTypeRedPacket         MsgType = 66      // 微信红包 // 436207665
+	MsgTypeSysNotice         MsgType = 9999    // SYSNOTICE
+	MsgTypeSystem            MsgType = 10000   // 红包、系统消息
+	MsgTypeRevoke            MsgType = 10002   // 撤回消息
+	MsgTypeSogouEmoji        MsgType = 1048625 // 搜狗表情
+	//MsgTypeLink              MsgType = 16777265   // 链接
+	//MsgTypeWechatRedPacket   MsgType = 436207665  // 微信红包 // 重复定义
+	MsgTypeRedPacketCover    MsgType = 536936497 // 红包封面
+	MsgTypeVideoChannelVideo MsgType = 754974769 // 视频号视频
+	MsgTypeVideoChannelCard  MsgType = 771751985 // 视频号名片
+	//MsgTypeQuote             MsgType = 822083633  // 引用消息
+	MsgTypePat               MsgType = 922746929  // 拍一拍
+	MsgTypeVideoChannelLive  MsgType = 973078577  // 视频号直播
+	MsgTypeProductLink       MsgType = 974127153  // 商品链接
+	MsgTypeVideoChannelLive2 MsgType = 975175729  // 视频号直播 // 重复定义
+	MsgTypeMusicLink         MsgType = 1040187441 // 音乐链接
+	MsgTypeFile              MsgType = 1090519089 // 文件
 )
 
 var MsgTypeNames = map[MsgType]string{
@@ -293,7 +299,11 @@ var MsgTypeNames = map[MsgType]string{
 	MsgTypeVideo:             "视频",
 	MsgTypeRockPaperScissors: "石头剪刀布 | 表情图片",
 	MsgTypeLocation:          "位置",
-	MsgTypeShare:             "共享实时位置、文件、转账、链接",
+	MsgTypeXML:               "xml消息",
+	MsgTypeXMLQuote:          "引用消息",
+	MsgTypeXMLImage:          "XML图片",
+	MsgTypeXMLFile:           "XML文件",
+	MsgTypeXMLLink:           "XML链接",
 	MsgTypeVoip:              "VOIPMSG",
 	MsgTypeWechatInit:        "微信初始化",
 	MsgTypeVoipNotify:        "VOIPNOTIFY",
@@ -304,17 +314,44 @@ var MsgTypeNames = map[MsgType]string{
 	MsgTypeSystem:            "红包、系统消息",
 	MsgTypeRevoke:            "撤回消息",
 	MsgTypeSogouEmoji:        "搜狗表情",
-	MsgTypeLink:              "链接",
-	MsgTypeWechatRedPacket:   "微信红包",
+	//MsgTypeLink:              "链接",
+	//MsgTypeWechatRedPacket:   "微信红包", // 与 MsgTypeRedPacket 重复
 	MsgTypeRedPacketCover:    "红包封面",
 	MsgTypeVideoChannelVideo: "视频号视频",
 	MsgTypeVideoChannelCard:  "视频号名片",
-	MsgTypeQuote:             "引用消息",
+	//MsgTypeQuote:             "引用消息",
 	MsgTypePat:               "拍一拍",
 	MsgTypeVideoChannelLive:  "视频号直播",
 	MsgTypeProductLink:       "商品链接",
+	MsgTypeVideoChannelLive2: "视频号直播", // 与上面的 MsgTypeVideoChannelLive 重复
 	MsgTypeMusicLink:         "音乐链接",
 	MsgTypeFile:              "文件",
+}
+
+// QuoteMsg 引用消息
+type QuoteMsg struct {
+	Type       int    `xml:"type"`
+	SvrId      string `xml:"svrid"`
+	FromUser   string `xml:"fromusr"`
+	ChatUser   string `xml:"chatusr"`
+	CreateTime int64  `xml:"createtime"`
+	MsgSource  string `xml:"msgsource"`
+	XMLSource  string
+	Content    string `xml:"content"`
+}
+
+// ReferMsg 引用的消息
+type ReferMsg struct {
+	Quote QuoteMsg `xml:"refermsg"`
+}
+
+// FileMsg 文件消息
+type FileMsg struct {
+	Title     string `xml:"title"`
+	FileExt   string `xml:"appattach>fileext"`
+	AppAttach struct {
+		TotalLen string `xml:"totallen"`
+	} `xml:"appattach"`
 }
 
 type SpecialUserType int

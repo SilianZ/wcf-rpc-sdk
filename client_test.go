@@ -8,7 +8,7 @@ import (
 // TestClient_Recv 持续接收消息
 func TestClient_Recv(t *testing.T) {
 	// 创建客户端实例
-	cli := NewClient(10, true, false)
+	cli := NewClient(10, false, false)
 
 	// 启动客户端，这里假设不需要自动注入微信
 	cli.Run(false)
@@ -263,9 +263,12 @@ func TestClient_IsSendByFriend(t *testing.T) {
 		t.Error("接收消息失败:", err.Error())
 	}
 	t.Logf("收到消息: %+v\n", msg)
-
-	isSendByFriend := msg.IsSendByFriend()
-	t.Logf("isFriend: %t", isSendByFriend)
+	if nil != msg {
+		isSendByFriend := msg.IsSendByFriend()
+		t.Logf("isFriend: %t", isSendByFriend)
+	} else {
+		t.Fatalf("msg is nil")
+	}
 }
 
 func TestClient_GetMember(t *testing.T) {

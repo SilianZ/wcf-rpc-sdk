@@ -2,13 +2,16 @@ package wcf_rpc_sdk
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
 	"github.com/Clov614/wcf-rpc-sdk/internal/manager"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
+	"github.com/antchfx/xmlquery"
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
+	"html"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -136,7 +139,7 @@ func (c *Client) GetMsgChan() <-chan *Message {
 func (c *Client) handleMsg(ctx context.Context) (err error) {
 	var handler wcf.MsgHandler = func(msg *wcf.WxMsg) error { // 回调函数
 		// todo 处理图片消息以及其他消息
-		covertedMsg := covertMsg(c, msg)
+		covertedMsg := c.covertMsg(msg)
 		if covertedMsg == nil {
 			return ErrNull
 		}
@@ -156,18 +159,18 @@ func (c *Client) handleMsg(ctx context.Context) (err error) {
 	return nil
 }
 
-func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
+func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	if msg == nil {
 		logging.ErrorWithErr(ErrNull, "internal msg is nil")
 		return nil
 	}
 	var roomMembers []*ContactInfo
 	if msg.IsGroup { // 群聊消息
-		roomMemberIds, err := cli.GetRoomMemberID(msg.Roomid)
+		roomMemberIds, err := c.GetRoomMemberID(msg.Roomid)
 		if err != nil {
 			logging.ErrorWithErr(err, "GetRoomMemberID")
 		} else {
-			roomMembers, err = cli.GetMember(roomMemberIds...)
+			roomMembers, err = c.GetMember(roomMemberIds...)
 			if err != nil {
 				logging.ErrorWithErr(err, "GetMember")
 			}
@@ -180,7 +183,7 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		IsSelf:    msg.IsSelf,
 		IsGroup:   msg.IsGroup,
 		MessageId: msg.Id,
-		Type:      msg.Type,
+		Type:      MsgType(msg.Type),
 		Ts:        msg.Ts,
 		RoomId:    msg.Roomid,
 		RoomData:  &RoomData{Members: roomMembers},
@@ -191,6 +194,32 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 		Extra:     msg.Extra,
 		Xml:       msg.Xml,
 	}
+
+	// 解析XML
+	if msg.Type == uint32(MsgTypeXML) { // 49
+		if strings.Contains(msg.Content, "<refermsg>") {
+			referMsg, err := parseReferMsg(msg.Content)
+			if err != nil {
+				logging.Debug("parseReferMsg", map[string]interface{}{"err": err, "xml": msg.Xml})
+			} else {
+				m.Type = MsgTypeXMLQuote
+				m.Quote = &referMsg.Quote
+			}
+		} else {
+			// 检查是否是文件类型
+			fileMsg := &FileMsg{}
+			err := xml.Unmarshal([]byte(msg.Content), fileMsg)
+			if err != nil {
+				logging.Debug("xml.Unmarshal fileMsg", map[string]interface{}{"err": err, "xml": msg.Xml})
+			} else {
+				if fileMsg.FileExt != "" {
+					m.Type = MsgTypeXMLFile
+					m.Content = fileMsg.Title
+				}
+			}
+		}
+	}
+
 	var sender = m.WxId
 	if m.IsGroup { // 群组则回复消息至群组
 		sender = m.RoomId
@@ -198,10 +227,101 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 	metaData := &meta{ // meta用于让消息可以直接调用回复
 		rawMsg: m,
 		sender: sender,
-		cli:    cli,
+		cli:    c,
 	}
 	m.meta = metaData
 	return m
+}
+
+func parseReferMsg(xmlStr string) (*ReferMsg, error) {
+	doc, err := xmlquery.Parse(strings.NewReader(xmlStr))
+	if err != nil {
+		return nil, fmt.Errorf("xmlquery.Parse error: %w", err)
+	}
+
+	// 使用 XPath 查找最内层的 refermsg 节点
+	referNode := xmlquery.FindOne(doc, "//refermsg[not(refermsg)]")
+	if referNode == nil {
+		return nil, nil // 没有找到 refermsg 节点
+	}
+
+	// 提取并反转义每个字段的值
+	referMsg := &ReferMsg{
+		Quote: QuoteMsg{
+			Type:       getInt(referNode, "type"),
+			SvrId:      getString(referNode, "svrid"),
+			FromUser:   getString(referNode, "fromusr"),
+			ChatUser:   getString(referNode, "chatusr"),
+			CreateTime: getInt64(referNode, "createtime"),
+			MsgSource:  getString(referNode, "msgsource"), // 可能需要进一步处理
+			XMLSource:  getString(referNode, "content"),
+			Content:    getReferMsgContentTitle(referNode), // 获取引用的消息的 title
+		},
+	}
+
+	return referMsg, nil
+}
+
+// 辅助函数：提取字符串并进行反转义
+func getString(node *xmlquery.Node, xpath string) string {
+	strNode := xmlquery.FindOne(node, xpath)
+	if strNode == nil {
+		return ""
+	}
+	return html.UnescapeString(strNode.InnerText())
+}
+
+// 辅助函数：提取整数
+func getInt(node *xmlquery.Node, xpath string) int {
+	str := getString(node, xpath) // 复用 getString 函数
+	if str == "" {
+		return 0
+	}
+	val, err := strconv.Atoi(str)
+	if err != nil {
+		return 0 // 或者根据需要处理错误
+	}
+	return val
+}
+
+// 辅助函数：提取 int64
+func getInt64(node *xmlquery.Node, xpath string) int64 {
+	str := getString(node, xpath) // 复用 getString 函数
+	if str == "" {
+		return 0
+	}
+	val, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return 0 // 或者根据需要处理错误
+	}
+	return val
+}
+
+// 辅助函数：提取 refermsg 中 content 字段内的 title
+func getReferMsgContentTitle(referNode *xmlquery.Node) string {
+	content := getString(referNode, "content")
+	if content == "" {
+		return ""
+	}
+
+	// 循环反转义
+	for strings.Contains(content, "&amp;") {
+		content = html.UnescapeString(content)
+	}
+
+	// 解析为 XML
+	contentDoc, err := xmlquery.Parse(strings.NewReader(content))
+	if err != nil {
+		return "" // 或者根据需要处理错误
+	}
+
+	// 提取 title
+	titleNode := xmlquery.FindOne(contentDoc, "//title")
+	if titleNode == nil {
+		return ""
+	}
+
+	return titleNode.InnerText()
 }
 
 // SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>
@@ -371,7 +491,6 @@ func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(
 func (c *Client) GetFriend(wxid string) (*Friend, error) {
 	info, err := c.getInfo(wxid, false, friendType, 3, c.cacheUser.Get)
 	if err != nil {
-		logging.ErrorWithErr(err, "get friend err", map[string]interface{}{"wxid": wxid})
 		return nil, err
 	}
 	res, _ := info.(*Friend)
