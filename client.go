@@ -73,12 +73,12 @@ func NewClient(msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 		}()
 
 	}
-	if autoInject { // todo test 待测试
+	if autoInject {
 		<-syncSignal
 	}
-	close(syncSignal) // 关闭同步
-	logging.Warn("30s后启动wcf客户端，请确保登录微信")
-	time.Sleep(30 * time.Second)
+	close(syncSignal) // 关闭同步管道
+	//logging.Warn("30s后启动wcf客户端，请确保登录微信")
+	//time.Sleep(30 * time.Second)
 	wxclient, err := wcf.NewWCF(addr)
 	if err != nil {
 		logging.Fatal(fmt.Errorf("new wcf err: %w", err).Error(), 1001)
@@ -479,7 +479,9 @@ func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool) {
 		case GH:
 			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "gh": v})
 		// todo cache GH
-		default:
+		case User: // User 类型为除了上方类型的特殊类型，如文件助手、漂流瓶等
+			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user})
+		default: // 未知类型
 			logging.Warn("unknown user type", map[string]interface{}{"user": user})
 		}
 	}
@@ -505,6 +507,10 @@ func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
 	case strings.HasPrefix(ct.Wxid, "gh_"):
 		return GH(user)
 	default:
+		specialUserType := GetSpecialUserType(ct.Wxid)
+		if specialUserType != SpecialUserTypeUnknown {
+			return user
+		}
 		logging.Warn("unknown contact type", map[string]interface{}{"type": ct.Wxid})
 		return nil
 	}

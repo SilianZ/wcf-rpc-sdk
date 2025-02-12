@@ -316,3 +316,35 @@ var MsgTypeNames = map[MsgType]string{
 	MsgTypeMusicLink:         "音乐链接",
 	MsgTypeFile:              "文件",
 }
+
+type SpecialUserType int
+
+const (
+	SpecialUserTypeUnknown     SpecialUserType = iota
+	SpecialUserTypeMediaNote                   // 影音号
+	SpecialUserTypeFloatBottle                 // 漂流瓶
+	SpecialUserTypeFileHelper                  // 文件助手
+	SpecialUserTypeFMessage                    // 朋友推荐消息
+)
+
+var SpecialUserTypeNames = map[SpecialUserType]string{
+	SpecialUserTypeUnknown:     "未知类型",
+	SpecialUserTypeMediaNote:   "影音号",
+	SpecialUserTypeFloatBottle: "漂流瓶",
+	SpecialUserTypeFileHelper:  "文件助手",
+	SpecialUserTypeFMessage:    "朋友推荐消息",
+}
+
+var SpecialUserTypeValues = map[string]SpecialUserType{
+	"medianote":   SpecialUserTypeMediaNote,
+	"floatbottle": SpecialUserTypeFloatBottle,
+	"filehelper":  SpecialUserTypeFileHelper,
+	"fmessage":    SpecialUserTypeFMessage,
+}
+
+func GetSpecialUserType(name string) SpecialUserType {
+	if value, ok := SpecialUserTypeValues[name]; ok {
+		return value
+	}
+	return SpecialUserTypeUnknown
+}
