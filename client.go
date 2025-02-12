@@ -335,13 +335,13 @@ func (c *Client) SendText(receiver string, content string, ats ...string) error 
 			atList = append(atList, "notify@all")
 			continue
 		}
-		friend, err := c.GetFriend(wxid)
-		if err != nil {
-			logging.WarnWithErr(err, "获取好友信息失败", map[string]interface{}{"wxid": wxid})
+		friend, err := c.GetMember(wxid)
+		if len(friend) == 0 || err != nil {
+			logging.WarnWithErr(err, "SendText.GetMember err")
 			names = append(names, wxid) // 如果获取失败，使用 wxid 代替
 			atList = append(atList, wxid)
 		} else {
-			names = append(names, friend.Name)
+			names = append(names, friend[0].NickName)
 			atList = append(atList, wxid)
 		}
 	}
