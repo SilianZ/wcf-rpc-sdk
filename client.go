@@ -1,7 +1,3 @@
-// Package wcf_rpc_sdk
-// @Author Clover
-// @Data 2025/1/13 下午8:49:00
-// @Desc
 package wcf_rpc_sdk
 
 import (
@@ -210,10 +206,42 @@ func covertMsg(cli *Client, msg *wcf.WxMsg) *Message {
 
 // SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>
 func (c *Client) SendText(receiver string, content string, ats ...string) error {
-	// todo test 需要手动在content里添加上 @<Name>    2025/1/17 可以将@按顺序插入文本中，ats也相应顺序 自动查询出<Name>替换入文本
-	// todo 可能需要搭配 根据wxid查询到对应的Name
-	// todo 增加一个wxid的全局cache
-	res := c.wxClient.SendTxt(content, receiver, ats)
+	// 根据 wxid 获取对应的 Name
+	names := make([]string, 0, len(ats))
+	atList := make([]string, 0, len(ats))
+	for _, wxid := range ats {
+		if wxid == "notify@all" {
+			names = append(names, "所有人")
+			atList = append(atList, "notify@all")
+			continue
+		}
+		friend, err := c.GetFriend(wxid)
+		if err != nil {
+			logging.WarnWithErr(err, "获取好友信息失败", map[string]interface{}{"wxid": wxid})
+			names = append(names, wxid) // 如果获取失败，使用 wxid 代替
+			atList = append(atList, wxid)
+		} else {
+			names = append(names, friend.Name)
+			atList = append(atList, wxid)
+		}
+	}
+
+	hasAt := strings.Contains(content, "@")
+
+	// 如果内容中不包含 @ 符号，则在开头添加 @<Name>
+	if !hasAt {
+		for _, name := range names {
+			content = "@" + name + " " + content
+		}
+	} else {
+		// 替换 @ 符号
+		for _, name := range names {
+			content = strings.Replace(content, "@", "@"+name+" ", 1)
+		}
+	}
+
+	// 发送文本
+	res := c.wxClient.SendTxt(content, receiver, atList)
 	if res != 0 {
 		logging.Debug("wxCliend.SendTxt", map[string]interface{}{"res": res, "receiver": receiver, "content": content, "ats": ats})
 		return fmt.Errorf("wxClient.SendTxt err, code: %d", res)

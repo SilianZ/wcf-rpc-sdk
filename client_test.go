@@ -59,9 +59,22 @@ func TestClient_SendGroupTextAndAt(t *testing.T) {
 
 	// 测试 SendText At
 	testReceiver := "45959390469@chatroom" // 测试12
-	testContent := "@AkiAoi-evil 123"      // todo test 需要手动在content里添加上 @<Name>
+	testContent := "1222@23"               // 初始内容，不包含 @<Name>
 	testAt := "wxid_jj4mhsji9tjk22"        // 替换为你要@的群成员的wxid
+
 	err := client.SendText(testReceiver, testContent, testAt)
+	if err != nil {
+		t.Fatalf("发送群消息失败: %v", err)
+	}
+
+	// 测试 SendText notify@all
+	testContent = "通知@所有人"
+	err = client.SendText(testReceiver, testContent, "notify@all")
+	if err != nil {
+		t.Fatalf("发送群消息失败: %v", err)
+	}
+	testContent = "一般无at默认消息114514"
+	err = client.SendText(testReceiver, testContent, "wxid_jj4mhsji9tjk22")
 	if err != nil {
 		t.Fatalf("发送群消息失败: %v", err)
 	}
