@@ -58,7 +58,7 @@ func callFunc(funName string, title string, debug bool, port int) {
 }
 
 /** 监听并等待SIGINT信号 */
-func waitingSignal(ctx context.Context) {
+func waitingSignal(ctx context.Context, cancel context.CancelFunc) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	logging.Info("Is running, press Ctrl+C to quit.")
@@ -66,6 +66,7 @@ func waitingSignal(ctx context.Context) {
 	case <-ctx.Done():
 		logging.Info("Context cancelled, exiting.")
 	case <-sigChan:
+		cancel()
 		logging.Info("Signal received, exiting.")
 	}
 	logging.Info("Stopped!")
@@ -91,6 +92,8 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 	logging.Info(fmt.Sprintf("Set sdk port: %d, debug: %t", port, debug))
 
 	startAt := time.Now()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	for {
 		select {
 		case <-ctx.Done():
@@ -100,7 +103,7 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 			if tryInject(debug, port) {
 				syncChan <- struct{}{} // 注入成功通知
 				logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
-				waitingSignal(ctx)
+				waitingSignal(ctx, cancel)
 				callFunc(funcDestroy, "SDK destroy", debug, port)
 				_ = gblDll.Release()
 				return
