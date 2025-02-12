@@ -198,12 +198,13 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	// 解析XML
 	if msg.Type == uint32(MsgTypeXML) { // 49
 		if strings.Contains(msg.Content, "<refermsg>") {
-			referMsg, err := parseReferMsg(msg.Content)
+			referMsg, content, err := parseReferMsg(msg.Content)
 			if err != nil {
 				logging.Debug("parseReferMsg", map[string]interface{}{"err": err, "xml": msg.Xml})
 			} else {
 				m.Type = MsgTypeXMLQuote
 				m.Quote = &referMsg.Quote
+				m.Content = content
 			}
 		} else {
 			// 检查是否是文件类型
@@ -233,16 +234,16 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	return m
 }
 
-func parseReferMsg(xmlStr string) (*ReferMsg, error) {
+func parseReferMsg(xmlStr string) (*ReferMsg, string, error) {
 	doc, err := xmlquery.Parse(strings.NewReader(xmlStr))
 	if err != nil {
-		return nil, fmt.Errorf("xmlquery.Parse error: %w", err)
+		return nil, "", fmt.Errorf("xmlquery.Parse error: %w", err)
 	}
 
 	// 使用 XPath 查找最内层的 refermsg 节点
 	referNode := xmlquery.FindOne(doc, "//refermsg[not(refermsg)]")
 	if referNode == nil {
-		return nil, nil // 没有找到 refermsg 节点
+		return nil, "", nil // 没有找到 refermsg 节点
 	}
 
 	// 提取并反转义每个字段的值
@@ -259,7 +260,7 @@ func parseReferMsg(xmlStr string) (*ReferMsg, error) {
 		},
 	}
 
-	return referMsg, nil
+	return referMsg, getString(doc, "//appmsg/title"), nil
 }
 
 // 辅助函数：提取字符串并进行反转义
