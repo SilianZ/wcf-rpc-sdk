@@ -330,14 +330,14 @@ var MsgTypeNames = map[MsgType]string{
 
 // QuoteMsg 引用消息
 type QuoteMsg struct {
-	Type       int    `xml:"type"`
-	SvrId      string `xml:"svrid"`
-	FromUser   string `xml:"fromusr"`
-	ChatUser   string `xml:"chatusr"`
-	CreateTime int64  `xml:"createtime"`
-	MsgSource  string `xml:"msgsource"`
+	Type       int    `xml:"type" json:"type"`
+	SvrId      string `xml:"svrid" json:"svrId"`
+	FromUser   string `xml:"fromusr" json:"fromUser"`
+	ChatUser   string `xml:"chatusr" json:"chatUser"`
+	CreateTime int64  `xml:"createtime" json:"createTime"`
+	MsgSource  string `xml:"msgsource" json:"msgSource"`
 	XMLSource  string
-	Content    string `xml:"content"`
+	Content    string `xml:"content" json:"content"`
 }
 
 // ReferMsg 引用的消息
