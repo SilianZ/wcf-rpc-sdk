@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
+	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 )
 
 var (
@@ -64,11 +65,17 @@ type Message struct {
 }
 
 type FileInfo struct {
-	FilePath string // Full file path
-	FileName string // File name including extension
-	FileExt  string // File extension
-	IsImg    bool   // Indicates if the file is an image
-	Base64   string // 可选，非必须
+	FilePath      string // Full file path
+	DecryptedPath string // Decrypted file path
+	FileName      string // File name including extension
+	FileExt       string // File extension
+	IsImg         bool   // Indicates if the file is an image
+	Base64        string // 可选，非必须
+}
+
+// GetImgBytes 获取图片数据
+func (fi *FileInfo) GetImgBytes() (imgData []byte, err error) {
+	return imgutil.ImgFetch(fi.DecryptedPath)
 }
 
 // ReplyText 回复文本

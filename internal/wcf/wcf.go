@@ -241,7 +241,6 @@ func (c *Client) RefreshPYQ() int32 {
 }
 
 // DecryptImage 解密图片 加密路径，解密路径
-// Deprecated
 func (c *Client) DecryptImage(src, dst string) string {
 	req := genFunReq(Functions_FUNC_DECRYPT_IMAGE)
 	q := Request_Dec{

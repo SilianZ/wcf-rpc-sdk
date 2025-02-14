@@ -13,6 +13,7 @@ import (
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
 	"html"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -196,7 +197,12 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 		time.Sleep(50 * time.Microsecond)
 		c.wxClient.DownloadAttach(m.MessageId, m.Thumb, m.Extra) // 下载图片
 
-		imgInfo := FileInfo{FilePath: m.Extra, IsImg: true}
+		// 解析并保存在本地
+		dst := filepath.Dir(m.Extra) + "/decryptedImg"
+		imgInfo := FileInfo{FilePath: m.Extra, IsImg: true, DecryptedPath: filepath.Join(dst, filepath.Base(m.Extra))}
+		go func() {
+			c.wxClient.DecryptImage(m.Extra, dst)
+		}()
 		// 解析图片数据
 		imgBytes, err := imgutil.DecodeDatFileToBytes(m.Extra)
 
