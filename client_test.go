@@ -1,6 +1,11 @@
 package wcf_rpc_sdk
 
 import (
+	"encoding/base64"
+	"fmt"
+	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -304,4 +309,61 @@ func TestClient_GetAllMember(t *testing.T) {
 	}
 
 	t.Log("members: ", members)
+}
+
+// TestClient_RecvAndDecodeImageMsg 持续接收消息, 并测试图片消息数据是否携带, 解码并保存图片
+func TestClient_RecvAndDecodeImageMsg(t *testing.T) {
+	// 创建客户端实例
+	cli := NewClient(10, false, false)
+
+	// 启动客户端，这里假设不需要自动注入微信
+	cli.Run(true)
+	// 关闭客户端
+	defer cli.Close()
+
+	for msg := range cli.GetMsgChan() {
+		t.Logf("收到消息，消息类型: %v", msg.Type)
+		if msg.Type == MsgTypeImage {
+			if msg.FileInfo == nil {
+				t.Errorf("图片消息 FileInfo 为 nil，图片数据未携带")
+			}
+			if msg.FileInfo != nil && msg.FileInfo.Base64 == "" {
+				t.Errorf("图片消息 FileInfo.Base64 为空，Base64 图片数据未携带")
+			}
+
+			// 解码 Base64 图片数据并保存到文件
+			if msg.FileInfo != nil && msg.FileInfo.Base64 != "" {
+				base64Data := msg.FileInfo.Base64
+				imgBytes, err := base64.StdEncoding.DecodeString(base64Data)
+				if err != nil {
+					t.Errorf("Base64 解码失败: %v", err)
+					return // 解码失败，结束测试
+				}
+
+				fileType, err := imgutil.DetectFileType(imgBytes)
+				if err != nil {
+					t.Errorf("图片类型检测失败: %v", err)
+					return // 类型检测失败，结束测试
+				}
+
+				// 保存图片到 ./source_test 目录
+				outputDir := "./source_test"
+				if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+					os.MkdirAll(outputDir, 0755) // 创建目录，如果不存在
+				}
+				outputPath := filepath.Join(outputDir, fmt.Sprintf("decoded_image_%d%s", time.Now().UnixNano(), fileType)) // 使用时间戳和扩展名生成文件名
+				err = os.WriteFile(outputPath, imgBytes, 0644)
+				if err != nil {
+					t.Errorf("保存图片文件失败: %v", err)
+					return // 保存失败，结束测试
+				}
+				t.Logf("图片已解码并保存到: %s", outputPath)
+			}
+
+			t.Logf("图片消息测试通过，FileInfo: %+v", msg.FileInfo)
+			return // 接收到图片消息并测试通过，结束测试
+		} else {
+			t.Logf("非图片消息，忽略: %v", msg.Type)
+		}
+	}
 }

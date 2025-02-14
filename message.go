@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
-	"github.com/Clov614/wcf-rpc-sdk/internal/manager"
 )
 
 var (
@@ -43,25 +42,33 @@ func (m *meta) IsSendByFriend() bool {
 }
 
 type Message struct {
-	meta      IMeta             // 用于实现对客户端操作
-	IsSelf    bool              `json:"is_self,omitempty"`
-	IsGroup   bool              `json:"is_group,omitempty"`
-	MessageId uint64            `json:"message_id,omitempty"`
-	Type      MsgType           `json:"type,omitempty"`
-	Ts        uint32            `json:"ts,omitempty"`
-	RoomId    string            `json:"room_id,omitempty"`
-	RoomData  *RoomData         `json:"room_data,omitempty"`
-	Content   string            `json:"content,omitempty"`
-	WxId      string            `json:"wx_id,omitempty"`
-	Sign      string            `json:"sign,omitempty"`
-	Thumb     string            `json:"thumb,omitempty"`
-	Extra     string            `json:"extra,omitempty"`
-	Xml       string            `json:"xml,omitempty"`
-	FileInfo  *manager.FileInfo `json:"-"`               // 图片保存信息
-	Quote     *QuoteMsg         `json:"quote,omitempty"` // 引用消息
+	meta      IMeta     // 用于实现对客户端操作
+	IsSelf    bool      `json:"is_self,omitempty"`
+	IsGroup   bool      `json:"is_group,omitempty"`
+	MessageId uint64    `json:"message_id,omitempty"`
+	Type      MsgType   `json:"type,omitempty"`
+	Ts        uint32    `json:"ts,omitempty"`
+	RoomId    string    `json:"room_id,omitempty"`
+	RoomData  *RoomData `json:"room_data,omitempty"`
+	Content   string    `json:"content,omitempty"`
+	WxId      string    `json:"wx_id,omitempty"`
+	Sign      string    `json:"sign,omitempty"`
+	Thumb     string    `json:"thumb,omitempty"`
+	Extra     string    `json:"extra,omitempty"`
+	Xml       string    `json:"xml,omitempty"`
+	FileInfo  *FileInfo `json:"-"`               // 图片保存信息
+	Quote     *QuoteMsg `json:"quote,omitempty"` // 引用消息
 
 	//UserInfo *UserInfo `json:"user_info,omitempty"` todo
 	//Contacts *Contacts `json:"contact,omitempty"`
+}
+
+type FileInfo struct {
+	FilePath string // Full file path
+	FileName string // File name including extension
+	FileExt  string // File extension
+	IsImg    bool   // Indicates if the file is an image
+	Base64   string // 可选，非必须
 }
 
 // ReplyText 回复文本
@@ -94,7 +101,7 @@ func (mb *MessageBuffer) Put(ctx context.Context, msg *Message) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case mb.msgCH <- msg:
-			logging.Info("put message to buffer")
+			logging.Debug("put message to buffer", map[string]interface{}{"msg": msg})
 			return nil
 		default:
 			logging.Warn("message buffer is full, retrying", map[string]interface{}{fmt.Sprintf("%d", i+1): retries})
@@ -112,7 +119,7 @@ func (mb *MessageBuffer) Get(ctx context.Context) (*Message, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case msg := <-mb.msgCH:
-		logging.Info("retrieved message pair from buffer")
+		logging.Debug("retrieved message pair from buffer", map[string]interface{}{"msg": msg})
 		return msg, nil
 	}
 }

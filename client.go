@@ -2,11 +2,12 @@ package wcf_rpc_sdk
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
-	"github.com/Clov614/wcf-rpc-sdk/internal/manager"
+	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
 	"github.com/antchfx/xmlquery"
 	"github.com/eatmoreapple/env"
@@ -30,22 +31,18 @@ var (
 )
 
 type Client struct {
-	ctx          context.Context
-	stop         context.CancelFunc
-	msgBuffer    *MessageBuffer
-	cacheManager *manager.CacheFileManager
-	wxClient     *wcf.Client
-	addr         string // 接口地址
-	self         *Self
-	cacheUser    *CacheUserManager // 用户信息缓存
+	ctx       context.Context
+	stop      context.CancelFunc
+	msgBuffer *MessageBuffer
+	wxClient  *wcf.Client
+	addr      string // 接口地址
+	self      *Self
+	cacheUser *CacheUserManager // 用户信息缓存
 }
 
 // Close 停止客户端
 func (c *Client) Close() {
 	c.stop()
-	if c.cacheManager != nil {
-		c.cacheManager.Close() // 清除缓存文件
-	}
 	if c.cacheUser != nil {
 		c.cacheUser.Close() // 释放信息缓存
 	}
@@ -193,6 +190,27 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 		Thumb:     msg.Thumb,
 		Extra:     msg.Extra,
 		Xml:       msg.Xml,
+	}
+	// 图片数据解析
+	if m.Type == MsgTypeImage {
+		time.Sleep(50 * time.Microsecond)
+		c.wxClient.DownloadAttach(m.MessageId, m.Thumb, m.Extra) // 下载图片
+
+		imgInfo := FileInfo{FilePath: m.Extra, IsImg: true}
+		// 解析图片数据
+		imgBytes, err := imgutil.DecodeDatFileToBytes(m.Extra)
+
+		if err != nil {
+			logging.ErrorWithErr(err, "imgutil.DecodeDatFileToBytes")
+		} else {
+			imgInfo.Base64 = base64.StdEncoding.EncodeToString(imgBytes)
+			detectFileType, err := imgutil.DetectFileType(imgBytes)
+			if err != nil {
+				logging.WarnWithErr(err, "DetectFileType error")
+			}
+			imgInfo.FileExt = string(detectFileType)
+		}
+		m.FileInfo = &imgInfo
 	}
 
 	// 解析XML
@@ -663,8 +681,6 @@ func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
 		return nil
 	}
 }
-
-// todo 图片解码模块
 
 // todo 发送图片
 

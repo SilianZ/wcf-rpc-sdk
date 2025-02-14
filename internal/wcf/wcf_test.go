@@ -352,8 +352,8 @@ func TestClient_DecryptImage(t *testing.T) {
 	defer c.Close()
 
 	// 请替换为实际的加密图片路径和目标路径
-	src := "C:/Users/aimi/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Image/2025-01/31d611357fdf46f144cea07cd9abd2c6.dat" // 请替换为实际的加密图片路径
-	dst := "C:/Users/aimi/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Image/2025-01/test.jpg"                             // 请替换为实际的解密图片保存路径
+	src := "C:/Users/Administrator/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Image/2025-02/010ff5751d7a461e3a98fe27fd5df1ab.dat" // 请替换为实际的加密图片路径
+	dst := "C:/Users/Administrator/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Image/2025-02/test.jpg"                             // 请替换为实际的解密图片保存路径
 
 	decryptedPath := c.DecryptImage(src, dst)
 	if decryptedPath == "" {
@@ -489,9 +489,9 @@ func TestClient_DownloadAttach(t *testing.T) {
 	defer c.Close()
 
 	// 这些值需要根据实际的消息来填写
-	msgID := uint64(5837917763151228085)                                                                                                                                            // 请替换为实际的消息 ID
-	thumb := "C:/Users/aimi/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Thumb/2025-01/5eefe5f664d26314675c45e643a32dd5_t.dat" // 请替换为实际的 thumb 路径
-	extra := "C:/Users/aimi/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Image/2025-01/39cd1240e4aa4609ffad8481c3d91584.dat"   // 请替换为实际的 extra 信息
+	msgID := uint64(5759396201173618136)                                                                                                                                                     // 请替换为实际的消息 ID
+	thumb := "C:/Users/Administrator/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Thumb/2025-02/40ec40baeaca9cf77a4cb60c77e3aef8_t.dat" // 请替换为实际的 thumb 路径
+	extra := "C:/Users/Administrator/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/MsgAttach/84d8449549662bc200b18aabcf977f3a/Image/2025-02/ad29e8de84f5d7a0a2412bd1fedcbb62.dat"   // 请替换为实际的 extra 信息
 
 	status := c.DownloadAttach(msgID, thumb, extra)
 	if status != 0 {

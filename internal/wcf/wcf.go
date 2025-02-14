@@ -500,7 +500,7 @@ func (c *Client) SendPat(roomId, wxId string) int32 {
 
 // DownloadAttach 下载附件
 func (c *Client) DownloadAttach(id uint64, thumb, extra string) int32 {
-	req := genFunReq(Functions_FUNC_SEND_PAT_MSG)
+	req := genFunReq(Functions_FUNC_DOWNLOAD_ATTACH)
 	req.Msg = &Request_Att{
 		Att: &AttachMsg{
 			Id:    id,
