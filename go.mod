@@ -3,7 +3,7 @@ module github.com/Clov614/wcf-rpc-sdk
 go 1.22
 
 require (
-	github.com/Clov614/logging v0.1.3
+	github.com/Clov614/logging v0.1.4
 	github.com/eatmoreapple/env v0.0.0-20230613094802-da1bd2d529d4
 	github.com/rs/zerolog v1.33.0
 	go.nanomsg.org/mangos/v3 v3.4.2
