@@ -386,3 +386,47 @@ func TestClient_GetFullFilePathFromRelativePath(t *testing.T) {
 		}
 	}
 }
+
+// TestClient_SendImage 测试发送图片消息 (需手动验证)
+func TestClient_SendImage(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	client.Run(false)
+	defer client.Close()
+
+	// 等待客户端启动完成
+	time.Sleep(5 * time.Second)
+
+	// 接收者 wxid, 默认为文件助手，可修改为其他好友或群
+	testReceiver := "filehelper"
+
+	// **测试发送本地图片**
+	//  请修改为你的本地图片路径，不存在则跳过本地图片测试
+	localImagePath := "C:\\image\\test01.png" // 修改为你的本地图片路径
+
+	err := client.SendImage(testReceiver, localImagePath)
+	if err != nil {
+		t.Fatalf("发送本地图片失败: %v", err)
+	}
+	t.Logf("本地图片发送成功, 请在微信中查看: %s", localImagePath)
+
+	// **测试发送网络图片**
+	//  使用网络图片 URL
+	networkImageUrl := "https://cdn.jsdelivr.net/gh/Xiao-yi123/WebImageFiles/146d33e6f92e89b5ae54a193ab2f7959.jpg" // 示例网络图片URL
+	err = client.SendImage(testReceiver, networkImageUrl)
+	if err != nil {
+		t.Fatalf("发送网络图片失败: %v", err)
+	}
+	t.Logf("网络图片发送成功, 请在微信中查看: %s", networkImageUrl)
+
+	// **手动测试步骤**
+	t.Log("\n**请手动测试:**")
+	t.Log("1. 检查微信是否收到 **本地图片** 和 **网络图片**")
+	t.Log("2. 确认图片内容正确")
+	t.Log("3. 如都收到且显示正常，则手动测试通过")
+
+	time.Sleep(5 * time.Second) //  等待 5 秒以便查看微信消息
+	t.Log("SendImage 测试完成, 请检查手动测试结果")
+}

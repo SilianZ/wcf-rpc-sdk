@@ -25,13 +25,13 @@ var httpClient = &http.Client{
 }
 
 func ImgFetch(path string) ([]byte, error) {
-	if isURL(path) {
+	if IsURL(path) {
 		return fetchFromURL(path)
 	}
 	return fetchFromFile(path)
 }
 
-func isURL(path string) bool {
+func IsURL(path string) bool {
 	return strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://")
 }
 
@@ -305,4 +305,22 @@ func testPrefix(prefixBytes []byte, bts []byte) (deCodeByte byte, error error) {
 		}
 	}
 	return initDecodeByte, nil
+}
+
+// CreateTempFile 创建临时文件
+func CreateTempFile(ext string) (*os.File, error) {
+	tmpFile, err := os.CreateTemp("", "tempimage-*"+ext)
+	if err != nil {
+		return nil, fmt.Errorf("CreateTempFile: os.CreateTemp: %w", err)
+	}
+	return tmpFile, nil
+}
+
+// RemoveTempFile 移除临时文件
+func RemoveTempFile(filePath string) error {
+	err := os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("RemoveTempFile: os.Remove: %w", err)
+	}
+	return nil
 }

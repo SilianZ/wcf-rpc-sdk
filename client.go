@@ -12,6 +12,7 @@ import (
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
 	"html"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -374,9 +375,41 @@ func (c *Client) SendText(receiver string, content string, ats ...string) error 
 
 // SendImage 发送图片 <wxid or roomid> <图片绝对路径>
 func (c *Client) SendImage(receiver string, src string) error {
+	var tmpFile *os.File    //  声明 tmpFile 变量
+	if imgutil.IsURL(src) { // 网络地址
+		bytes, err := imgutil.ImgFetch(src)
+		if err != nil {
+			logging.ErrorWithErr(err, "imgutil.ImgFetch")
+			return err
+		}
+		// 创建临时文件
+		tmpFile, err = imgutil.CreateTempFile(".jpg")
+		if err != nil {
+			logging.ErrorWithErr(err, "imgutil.CreateTempFile")
+			return err
+		}
+		defer func() { // 使用闭包处理 tmpFile.Close() 的错误
+			if closeErr := tmpFile.Close(); closeErr != nil {
+				logging.ErrorWithErr(closeErr, "tmpFile.Close error in defer")
+			}
+		}()
+
+		// 写入临时文件
+		_, err = tmpFile.Write(bytes)
+		if err != nil {
+			logging.ErrorWithErr(err, "tmpFile.Write")
+			return err
+		}
+		src = tmpFile.Name() // 使用临时文件路径
+	}
 	res := c.wxClient.SendIMG(src, receiver)
+	if imgutil.IsURL(src) && tmpFile != nil { //  只有网络图片才删除临时文件, 并且确保 tmpFile 不为 nil
+		if removeErr := imgutil.RemoveTempFile(tmpFile.Name()); removeErr != nil {
+			logging.ErrorWithErr(removeErr, "imgutil.RemoveTempFile error")
+		}
+	}
 	if res != 0 {
-		logging.Debug("wxCliend.SendIMG", map[string]interface{}{"res": res, "receiver": receiver})
+		logging.Debug("wxCliend.SendIMG", map[string]interface{}{"res": res, "receiver": receiver, "src": src}) // 打印 src 方便debug
 		return fmt.Errorf("wxClient.SendIMG err, code: %d", res)
 	}
 	return nil
