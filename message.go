@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"github.com/Clov614/logging"
 	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
+	"path/filepath"
+	"strings"
 )
 
 var (
@@ -65,17 +67,43 @@ type Message struct {
 }
 
 type FileInfo struct {
-	FilePath      string // Full file path
-	DecryptedPath string // Decrypted file path
-	FileName      string // File name including extension
-	FileExt       string // File extension
-	IsImg         bool   // Indicates if the file is an image
-	Base64        string // 可选，非必须
+	FilePath                   string // Full file path
+	RelativePathAfterMsgAttach string // MsgAttach 之后的相对路径
+	FileName                   string // File name including extension
+	FileExt                    string // File extension
+	IsImg                      bool   // Indicates if the file is an image
+	Data                       []byte // 图片数据
 }
 
-// GetImgBytes 获取图片数据
-func (fi *FileInfo) GetImgBytes() (imgData []byte, err error) {
-	return imgutil.ImgFetch(fi.DecryptedPath)
+// DecryptImg 解析图片信息
+func (fi *FileInfo) DecryptImg() (err error) {
+	fi.Data, err = imgutil.DecodeDatFileToBytes(fi.FilePath)
+	if err != nil {
+		return fmt.Errorf("decrypt img error: %w", err)
+	}
+	fileType, err := imgutil.DetectFileType(fi.Data)
+	if err != nil {
+		logging.WarnWithErr(err, "detect file type")
+	}
+	fi.FileExt = string(fileType)
+	return nil
+}
+
+// ExtractRelativePath 提取路径后缀
+func (fi *FileInfo) ExtractRelativePath() string {
+	if fi.RelativePathAfterMsgAttach != "" {
+		return fi.RelativePathAfterMsgAttach
+	}
+	msgAttachIndex := strings.Index(fi.FilePath, "MsgAttach")
+	if msgAttachIndex != -1 {
+		relativePath := fi.FilePath[msgAttachIndex+len("MsgAttach"):]
+		// 使用 filepath.Join 确保路径以 / 开头 (如果需要) 并进行清理
+		extractedPath := filepath.Join("/", relativePath) //  "/" 作为第一个参数，确保路径是绝对路径 (相对 MsgAttach 而言)
+		// 注意: filepath.Join 会清理路径，例如将 "//" 变为 "/"
+		fi.RelativePathAfterMsgAttach = filepath.ToSlash(extractedPath) // 使用 filepath.ToSlash 转换为正斜杠
+		return fi.RelativePathAfterMsgAttach
+	}
+	return ""
 }
 
 // ReplyText 回复文本
@@ -153,8 +181,9 @@ type User struct {
 
 type Self struct { // 机器人自己
 	User
-	Mobile string `json:"mobile,omitempty"` // 个人信息时携带
-	Home   string `json:"home,omitempty"`   // 个人信息时携带
+	Mobile          string `json:"mobile,omitempty"` // 个人信息时携带
+	Home            string `json:"home,omitempty"`   // C:/Users/Administrator/Documents/WeChat Files/
+	FileStoragePath string `json:"fileStoragePath"`  // C:/Users/Administrator/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/
 }
 
 // FriendList 联系人

@@ -2,12 +2,10 @@ package wcf_rpc_sdk
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
-	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
 	"github.com/antchfx/xmlquery"
 	"github.com/eatmoreapple/env"
@@ -196,27 +194,7 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	if m.Type == MsgTypeImage {
 		time.Sleep(50 * time.Microsecond)
 		c.wxClient.DownloadAttach(m.MessageId, m.Thumb, m.Extra) // 下载图片
-
-		// 解析并保存在本地
-		dst := filepath.Dir(m.Extra) + "/decryptedImg"
-		imgInfo := FileInfo{FilePath: m.Extra, IsImg: true, DecryptedPath: filepath.Join(dst, filepath.Base(m.Extra))}
-		go func() {
-			c.wxClient.DecryptImage(m.Extra, dst)
-		}()
-		// 解析图片数据
-		imgBytes, err := imgutil.DecodeDatFileToBytes(m.Extra)
-
-		if err != nil {
-			logging.ErrorWithErr(err, "imgutil.DecodeDatFileToBytes")
-		} else {
-			imgInfo.Base64 = base64.StdEncoding.EncodeToString(imgBytes)
-			detectFileType, err := imgutil.DetectFileType(imgBytes)
-			if err != nil {
-				logging.WarnWithErr(err, "DetectFileType error")
-			}
-			imgInfo.FileExt = string(detectFileType)
-		}
-		m.FileInfo = &imgInfo
+		m.FileInfo = &FileInfo{FilePath: filepath.ToSlash(m.Extra), IsImg: true}
 	}
 
 	// 解析XML
@@ -432,6 +410,7 @@ func (c *Client) GetSelfInfo() *Self {
 	self.Name = u.Name
 	self.Mobile = u.Mobile
 	self.Home = u.Home
+	self.FileStoragePath = filepath.Join(u.Home, u.Wxid, "FileStorage")
 	c.self = self // 更新缓存
 	return self
 }
@@ -456,6 +435,17 @@ func (c *Client) GetSelfWxId() string {
 		return ""
 	}
 	return c.self.Wxid
+}
+
+// GetSelfFileStoragePath 获取机器人文件存储路径
+func (c *Client) GetSelfFileStoragePath() string {
+	if c.self == nil || c.self.FileStoragePath == "" {
+		c.GetSelfInfo() // 更新缓存
+	}
+	if c.self == nil {
+		return ""
+	}
+	return c.self.FileStoragePath
 }
 
 // cyclicUpdateSelfInfo 定时更新机器人信息 <immediate 立即执行一次>
@@ -757,4 +747,17 @@ func (c *Client) getAllMember() *[]*ContactInfo {
 	}
 	logging.Debug("client.getAllMember()", map[string]interface{}{"memberList": memberList})
 	return &memberList
+}
+
+// GetFullFilePathFromRelativePath 通过相对路径获取完整文件路径
+func (c *Client) GetFullFilePathFromRelativePath(relativePath string) string {
+	fileStoragePath := c.GetSelfFileStoragePath()
+	if fileStoragePath == "" {
+		logging.Error("GetFullFilePathFromRelativePath: FileStoragePath is empty")
+		return "" // 或者返回错误
+	}
+	// todo 后续可能支持其他的dat解析
+	// MsgAttach
+	fullFilePath := filepath.Join(fileStoragePath, "MsgAttach", relativePath)
+	return filepath.ToSlash(fullFilePath) // 使用 filepath.ToSlash 转换为正斜杠
 }
