@@ -135,7 +135,6 @@ func (c *Client) GetMsgChan() <-chan *Message {
 
 func (c *Client) handleMsg(ctx context.Context) (err error) {
 	var handler wcf.MsgHandler = func(msg *wcf.WxMsg) error { // 回调函数
-		// todo 处理图片消息以及其他消息
 		covertedMsg := c.covertMsg(msg)
 		if covertedMsg == nil {
 			return ErrNull
@@ -373,6 +372,26 @@ func (c *Client) SendText(receiver string, content string, ats ...string) error 
 	return nil
 }
 
+// SendImage 发送图片 <wxid or roomid> <图片绝对路径>
+func (c *Client) SendImage(receiver string, src string) error {
+	res := c.wxClient.SendIMG(src, receiver)
+	if res != 0 {
+		logging.Debug("wxCliend.SendIMG", map[string]interface{}{"res": res, "receiver": receiver})
+		return fmt.Errorf("wxClient.SendIMG err, code: %d", res)
+	}
+	return nil
+}
+
+// SendFile 发送图片 <wxid or roomid> <文件绝对路径>
+func (c *Client) SendFile(receiver string, src string) error {
+	res := c.wxClient.SendFile(src, receiver)
+	if res != 0 {
+		logging.Debug("wxCliend.SendFile", map[string]interface{}{"res": res, "receiver": receiver})
+		return fmt.Errorf("wxClient.SendFile err, code: %d", res)
+	}
+	return nil
+}
+
 // GetRoomMemberID 获取群成员信息，返回解码后的字符串以及 wxid 列表
 func (c *Client) GetRoomMemberID(roomId string) ([]string, error) {
 	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
@@ -396,8 +415,6 @@ func (c *Client) GetRoomMemberID(roomId string) ([]string, error) {
 
 	return wxids, nil
 }
-
-// todo GetAllRoomMember
 
 // GetSelfInfo 获取账号个人信息
 func (c *Client) GetSelfInfo() *Self {
@@ -678,10 +695,6 @@ func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
 		return nil
 	}
 }
-
-// todo 发送图片
-
-// todo 对应消息的回复 message.Reply(xx)
 
 // getAllMember 获取所有的联系人（包括群聊中的陌生群成员）
 func (c *Client) getAllMember() *[]*ContactInfo {

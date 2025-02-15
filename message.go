@@ -20,6 +20,8 @@ var (
 
 type IMeta interface {
 	ReplyText(content string, ats ...string) error
+	ReplyImage(src string) error
+	ReplyFile(src string) error
 	IsSendByFriend() bool
 }
 
@@ -33,6 +35,16 @@ type meta struct {
 // ReplyText 回复文本
 func (m *meta) ReplyText(content string, ats ...string) error {
 	return m.cli.SendText(m.sender, content, ats...)
+}
+
+// ReplyImage 回复图片
+func (m *meta) ReplyImage(src string) error {
+	return m.cli.SendImage(m.sender, src)
+}
+
+// ReplyFile 回复文件
+func (m *meta) ReplyFile(src string) error {
+	return m.cli.SendFile(m.sender, src)
 }
 
 // IsSendByFriend 是否好友发送的消息
@@ -109,6 +121,16 @@ func (fi *FileInfo) ExtractRelativePath() string {
 // ReplyText 回复文本
 func (m *Message) ReplyText(content string, ats ...string) error {
 	return m.meta.ReplyText(content, ats...)
+}
+
+// ReplyImage 回复图片
+func (m *Message) ReplyImage(src string) error {
+	return m.meta.ReplyImage(src)
+}
+
+// ReplyFile 回复文件
+func (m *Message) ReplyFile(src string) error {
+	return m.meta.ReplyFile(src)
 }
 
 // IsSendByFriend 是否为好友的消息
