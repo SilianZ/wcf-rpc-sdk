@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
+	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
 	"github.com/antchfx/xmlquery"
 	"github.com/eatmoreapple/env"
@@ -760,4 +761,14 @@ func (c *Client) GetFullFilePathFromRelativePath(relativePath string) string {
 	// MsgAttach
 	fullFilePath := filepath.Join(fileStoragePath, "MsgAttach", relativePath)
 	return filepath.ToSlash(fullFilePath) // 使用 filepath.ToSlash 转换为正斜杠
+}
+
+// DecodeDatFileToBytes 解码 .dat 文件为图片, 并返回字节数组
+func (c *Client) DecodeDatFileToBytes(datPath string) []byte {
+	bytes, err := imgutil.DecodeDatFileToBytes(datPath)
+	if err != nil {
+		logging.ErrorWithErr(err, "DecodeDatFileToBytes", nil)
+		return nil
+	}
+	return bytes
 }
