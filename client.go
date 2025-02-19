@@ -643,6 +643,10 @@ func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
 
 // 更新缓存用户信息 <isAsync GetAllMember是否异步> <是否输出错误日志>
 func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool) {
+	if !c.wxClient.IsLogin() {
+		logging.WarnWithErr(ErrNotLogin, "[尚未登陆]跳过更新联系人信息")
+		return
+	}
 	contacts := c.wxClient.GetContacts()
 	if len(contacts) == 0 {
 		logging.ErrorWithErr(ErrNull, "get contacts err")
