@@ -658,6 +658,9 @@ func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool, async bool) {
 		group.Add(1)
 	}
 	go func() {
+		if async {
+			defer group.Done()
+		}
 		contacts := c.wxClient.GetContacts()
 		if len(contacts) == 0 {
 			logging.ErrorWithErr(ErrNull, "get contacts err")
@@ -713,9 +716,10 @@ func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool, async bool) {
 				logging.Warn("unknown user type", map[string]interface{}{"user": user})
 			}
 		}
-		group.Done()
 	}()
-	group.Wait()
+	if async {
+		group.Wait()
+	}
 }
 
 // getWxIdType 判断 wxid 类型
