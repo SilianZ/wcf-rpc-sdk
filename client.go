@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -543,11 +544,15 @@ func isNil(i interface{}) bool {
 
 func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(id string, isAll bool, t InfoType) (interface{}, error)) (interface{}, error) {
 	result, err := f(wxid, isAll, t)
+
 	if retry > 0 && isNil(result) {
-		if t == memberType || t == roomType {
-			c.updateCacheInfo(true, retry <= 0)
+		if t == memberType {
+			if c.cacheUser.memberCount != 0 {
+				c.updateCacheInfo(true, retry <= 0, true)
+			}
+			c.updateCacheInfo(true, retry <= 0, false)
 		} else {
-			c.updateCacheInfo(false, retry <= 0)
+			c.updateCacheInfo(false, retry <= 0, false)
 		}
 		return c.getInfo(wxid, isAll, t, retry-1, f)
 	}
@@ -628,7 +633,7 @@ func (c *Client) GetAllMember() ([]*ContactInfo, error) {
 // 定时更新用户信息 <immediate 立即执行一次>
 func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
 	if immediate {
-		c.updateCacheInfo(true, true)
+		c.updateCacheInfo(true, true, true)
 	}
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -637,72 +642,80 @@ func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			c.updateCacheInfo(true, true) // 每分钟更新一次
+			c.updateCacheInfo(true, true, true) // 每分钟更新一次
 		}
 	}
 }
 
 // 更新缓存用户信息 <isAsync GetAllMember是否异步> <是否输出错误日志>
-func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool) {
+func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool, async bool) {
 	if !c.wxClient.IsLogin() {
 		logging.WarnWithErr(ErrNotLogin, "[尚未登陆]跳过更新联系人信息")
 		return
 	}
-	contacts := c.wxClient.GetContacts()
-	if len(contacts) == 0 {
-		logging.ErrorWithErr(ErrNull, "get contacts err")
-		return
+	group := sync.WaitGroup{}
+	if async {
+		group.Add(1)
 	}
-	if IsGetMember {
-		c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
-	}
-	for _, contact := range contacts {
-		user := c.getUser(contact)
-		if user == nil {
-			continue
+	go func() {
+		contacts := c.wxClient.GetContacts()
+		if len(contacts) == 0 {
+			logging.ErrorWithErr(ErrNull, "get contacts err")
+			return
 		}
-		switch v := user.(type) {
-		case Friend:
-			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "friend": v})
-			c.cacheUser.updateFriend(&v)
-		case ChatRoom: // todo 完善chatRoom字段
-			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "chatroom": v})
-			v.RoomID = v.Wxid
-			roomMemberIds, err := c.GetRoomMemberID(v.RoomID)
-			if err != nil {
-				if isLogErr {
-					logging.WarnWithErr(err, "get room member id err")
-				}
-			} else {
-				members, err := c.cacheUser.GetMemberByList(roomMemberIds...) // todo 疑似成员不全，一些成员获取失败（换方式获取）
+		if IsGetMember {
+			c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
+		}
+		for _, contact := range contacts {
+			user := c.getUser(contact)
+			if user == nil {
+				continue
+			}
+			switch v := user.(type) {
+			case Friend:
+				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "friend": v})
+				c.cacheUser.updateFriend(&v)
+			case ChatRoom: // todo 完善chatRoom字段
+				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "chatroom": v})
+				v.RoomID = v.Wxid
+				roomMemberIds, err := c.GetRoomMemberID(v.RoomID)
 				if err != nil {
 					if isLogErr {
-						logging.WarnWithErr(err, "get room member err")
+						logging.WarnWithErr(err, "get room member id err")
 					}
 				} else {
-					v.RoomData = &RoomData{Members: members}
+					members, err := c.cacheUser.GetMemberByList(roomMemberIds...) // todo 疑似成员不全，一些成员获取失败（换方式获取）
+					if err != nil {
+						if isLogErr {
+							logging.WarnWithErr(err, "get room member err")
+						}
+					} else {
+						v.RoomData = &RoomData{Members: members}
+					}
 				}
-			}
-			room, err := c.cacheUser.GetMember(v.RoomID)
-			if err != nil {
-				if isLogErr {
-					logging.WarnWithErr(err, "get room err")
-				}
+				room, err := c.cacheUser.GetMember(v.RoomID)
+				if err != nil {
+					if isLogErr {
+						logging.WarnWithErr(err, "get room err")
+					}
 
-			} else {
-				v.RoomHeadImgURL = &room.SmallHeadURL
-				//todo 公告字段 v.RoomAnnouncement
+				} else {
+					v.RoomHeadImgURL = &room.SmallHeadURL
+					//todo 公告字段 v.RoomAnnouncement
+				}
+				c.cacheUser.updateChatRoom(&v)
+			case GH:
+				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "gh": v})
+			// todo cache GH
+			case User: // User 类型为除了上方类型的特殊类型，如文件助手、漂流瓶等
+				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user})
+			default: // 未知类型
+				logging.Warn("unknown user type", map[string]interface{}{"user": user})
 			}
-			c.cacheUser.updateChatRoom(&v)
-		case GH:
-			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "gh": v})
-		// todo cache GH
-		case User: // User 类型为除了上方类型的特殊类型，如文件助手、漂流瓶等
-			logging.Debug("updateCacheInfo", map[string]interface{}{"user": user})
-		default: // 未知类型
-			logging.Warn("unknown user type", map[string]interface{}{"user": user})
 		}
-	}
+		group.Done()
+	}()
+	group.Wait()
 }
 
 // getWxIdType 判断 wxid 类型
