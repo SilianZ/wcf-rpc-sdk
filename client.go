@@ -674,7 +674,7 @@ func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool) {
 					logging.WarnWithErr(err, "get room member id err")
 				}
 			} else {
-				members, err := c.cacheUser.GetMemberByList(roomMemberIds...)
+				members, err := c.cacheUser.GetMemberByList(roomMemberIds...) // todo 疑似成员不全，一些成员获取失败（换方式获取）
 				if err != nil {
 					if isLogErr {
 						logging.WarnWithErr(err, "get room member err")
@@ -750,50 +750,50 @@ func (c *Client) getAllMember() *[]*ContactInfo {
 				cInfo.Wxid = string(field.Content)
 			case "Alias":
 				cInfo.Alias = string(field.Content)
-			case "DelFlag":
-				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
-					cInfo.DelFlag = uint8(num)
-				} else {
-					logging.WarnWithErr(err, "error parsing DelFlag")
-					cInfo.DelFlag = 0 // todo 或者其他默认值
-				}
-			case "Type":
-				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
-					cInfo.ContactType = uint8(num)
-				} else {
-					cInfo.ContactType = 0
-				}
+			//case "DelFlag":
+			//	if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+			//		cInfo.DelFlag = uint8(num)
+			//	} else {
+			//		logging.WarnWithErr(err, "error parsing DelFlag")
+			//		cInfo.DelFlag = 0 // todo 或者其他默认值
+			//	}
+			//case "Type":
+			//	if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+			//		cInfo.ContactType = uint8(num)
+			//	} else {
+			//		cInfo.ContactType = 0
+			//	}
 			case "Remark":
 				cInfo.Remark = string(field.Content)
 			case "NickName":
 				cInfo.NickName = string(field.Content)
-			case "PYInitial":
-				cInfo.PyInitial = string(field.Content)
-			case "QuanPin":
-				cInfo.QuanPin = string(field.Content)
-			case "RemarkPYInitial":
-				cInfo.RemarkPyInitial = string(field.Content)
-			case "RemarkQuanPin":
-				cInfo.RemarkQuanPin = string(field.Content)
-			case "SmallHeadImgUrl":
-				cInfo.SmallHeadURL = string(field.Content)
-			case "BigHeadImgUrl":
-				cInfo.BigHeadURL = string(field.Content)
+				//case "PYInitial":
+				//	cInfo.PyInitial = string(field.Content)
+				//case "QuanPin":
+				//	cInfo.QuanPin = string(field.Content)
+				//case "RemarkPYInitial":
+				//	cInfo.RemarkPyInitial = string(field.Content)
+				//case "RemarkQuanPin":
+				//	cInfo.RemarkQuanPin = string(field.Content)
+				//case "SmallHeadImgUrl":
+				//	cInfo.SmallHeadURL = string(field.Content)
+				//case "BigHeadImgUrl":
+				//	cInfo.BigHeadURL = string(field.Content)
+				//}
 			}
-		}
-		// 查询小头像和大头像
-		if cInfo.Wxid != "" {
-			query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
-			for _, row := range query {
-				for _, field := range row.Fields {
-					switch field.Column {
-					case "smallHeadImgUrl":
-						cInfo.SmallHeadURL = string(field.Content)
-					case "bigHeadImgUrl":
-						cInfo.BigHeadURL = string(field.Content)
-					}
-				}
-			}
+			//	// 查询小头像和大头像
+			//	if cInfo.Wxid != "" {
+			//		query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
+			//		for _, row := range query {
+			//			for _, field := range row.Fields {
+			//				switch field.Column {
+			//				case "smallHeadImgUrl":
+			//					cInfo.SmallHeadURL = string(field.Content)
+			//				case "bigHeadImgUrl":
+			//					cInfo.BigHeadURL = string(field.Content)
+			//				}
+			//			}
+			//		}
 		}
 		memberList = append(memberList, cInfo)
 	}

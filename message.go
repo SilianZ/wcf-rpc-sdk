@@ -52,7 +52,7 @@ func (m *meta) IsSendByFriend() bool {
 	if m.rawMsg.IsSelf {
 		return false
 	}
-	friend, _ := m.cli.GetFriend(m.rawMsg.WxId)
+	friend, _ := m.cli.GetFriend(m.rawMsg.WxId) // todo 这边本意是区分群聊、公众号、好友 但是群聊消息中的wxId不为空，当前意思是判断是否好友的消息
 	return friend != nil
 }
 

@@ -430,3 +430,25 @@ func TestClient_SendImage(t *testing.T) {
 	time.Sleep(5 * time.Second) //  等待 5 秒以便查看微信消息
 	t.Log("SendImage 测试完成, 请检查手动测试结果")
 }
+
+func TestClient_getAllMember(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	client.Run(false)
+	defer client.Close()
+	var flag = false
+	infos := *client.getAllMember()
+	for _, info := range infos {
+		if info.Wxid == "wxid_qyutq6wnee2f22" {
+			flag = true
+			t.Log("存在")
+		}
+	}
+	if flag == false {
+		t.Logf("不存在")
+		t.Fail()
+	}
+
+}

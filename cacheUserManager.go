@@ -136,6 +136,7 @@ func (cm *CacheUserManager) GetMemberByList(wxIdList ...string) ([]*ContactInfo,
 	for _, wxId := range wxIdList {
 		value, ok := cm.memberCache.Load(wxId)
 		if !ok {
+			list = append(list, &ContactInfo{Wxid: wxId}) // 不存在就只返回wxid的info
 			continue
 		}
 		list = append(list, value.(*ContactInfo))
