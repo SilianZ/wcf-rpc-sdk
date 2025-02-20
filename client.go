@@ -179,6 +179,7 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	m := &Message{
 		IsSelf:    msg.IsSelf,
 		IsGroup:   msg.IsGroup,
+		IsGH:      strings.HasPrefix(msg.Sender, "gh_"), // 是否为公众号
 		MessageId: msg.Id,
 		Type:      MsgType(msg.Type),
 		Ts:        msg.Ts,

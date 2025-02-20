@@ -60,6 +60,7 @@ type Message struct {
 	meta      IMeta     // 用于实现对客户端操作
 	IsSelf    bool      `json:"is_self,omitempty"`
 	IsGroup   bool      `json:"is_group,omitempty"`
+	IsGH      bool      `json:"is_gh,omitempty"` // 是否公众号
 	MessageId uint64    `json:"message_id,omitempty"`
 	Type      MsgType   `json:"type,omitempty"`
 	Ts        uint32    `json:"ts,omitempty"`
