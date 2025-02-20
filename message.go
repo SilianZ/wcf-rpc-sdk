@@ -72,20 +72,20 @@ type Message struct {
 	Thumb     string    `json:"thumb,omitempty"`
 	Extra     string    `json:"extra,omitempty"`
 	Xml       string    `json:"xml,omitempty"`
-	FileInfo  *FileInfo `json:"-"`               // 图片保存信息
-	Quote     *QuoteMsg `json:"quote,omitempty"` // 引用消息
+	FileInfo  *FileInfo `json:"file_info,omitempty"` // 图片保存信息
+	Quote     *QuoteMsg `json:"quote,omitempty"`     // 引用消息
 
 	//UserInfo *UserInfo `json:"user_info,omitempty"` todo
 	//Contacts *Contacts `json:"contact,omitempty"`
 }
 
 type FileInfo struct {
-	FilePath                   string // Full file path
-	RelativePathAfterMsgAttach string // MsgAttach 之后的相对路径
-	FileName                   string // File name including extension
-	FileExt                    string // File extension
-	IsImg                      bool   // Indicates if the file is an image
-	Data                       []byte // 图片数据
+	FilePath                   string `json:"file_path,omitempty"`                      // Full file path
+	RelativePathAfterMsgAttach string `json:"relative_path_after_msg_attach,omitempty"` // MsgAttach 之后的相对路径
+	FileName                   string `json:"file_name,omitempty"`                      // File name including extension
+	FileExt                    string `json:"file_ext,omitempty"`                       // File extension
+	IsImg                      bool   `json:"is_img,omitempty"`                         // Indicates if the file is an image
+	Data                       []byte `json:"-"	`                                       // 图片数据
 }
 
 // DecryptImg 解析图片信息
@@ -402,7 +402,7 @@ type QuoteMsg struct {
 	ChatUser   string `xml:"chatusr" json:"chatUser"`
 	CreateTime int64  `xml:"createtime" json:"createTime"`
 	MsgSource  string `xml:"msgsource" json:"msgSource"`
-	XMLSource  string
+	XMLSource  string `xml:"-" json:"-"`
 	Content    string `xml:"content" json:"content"`
 }
 
