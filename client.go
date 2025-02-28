@@ -40,24 +40,40 @@ type Client struct {
 	addr      string // 接口地址
 	self      *Self
 	cacheUser *CacheUserManager // 用户信息缓存
+	closeOnce sync.Once
 }
 
 // Close 停止客户端
 func (c *Client) Close() {
-	c.stop()
-	if c.cacheUser != nil {
-		c.cacheUser.Close() // 释放信息缓存
-	}
-	err := c.wxClient.Close()
-	if err != nil {
-		logging.ErrorWithErr(err, "停止wcf客户端发生了错误")
-	}
+	c.closeOnce.Do(func() {
+		c.stop()
+		if c.cacheUser != nil {
+			c.cacheUser.Close() // 释放信息缓存
+		}
+		err := c.wxClient.Close()
+		if err != nil {
+			logging.ErrorWithErr(err, "停止wcf客户端发生了错误")
+		}
+	})
 }
 
 // NewClient <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
 func NewClient(msgChanSize int, autoInject bool, sdkDebug bool) *Client {
+	ctx := context.Background()
+	return newClient(ctx, msgChanSize, autoInject, sdkDebug)
+}
+
+// NewClientWithCtx <上下文> <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
+func NewClientWithCtx(ctx context.Context, msgChanSize int, autoInject bool, sdkDebug bool) *Client {
+	if ctx == nil {
+		panic("ctx is nil")
+	}
+	return newClient(ctx, msgChanSize, autoInject, sdkDebug)
+}
+
+func newClient(ctx context.Context, msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 	addr := env.Name(ENVTcpAddr).StringOrElse(DefaultTcpAddr) // "tcp://127.0.0.1:10086"
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	var syncSignal = make(chan struct{}) // 同步信号 确保注入后处理消息
 	if autoInject {                      // 自动注入
 		port, err := strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
@@ -69,14 +85,9 @@ func NewClient(msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 		go func() {
 			Inject(ctx, port, sdkDebug, syncSignal) // 调用sdk.dll 注入&启动微信
 		}()
-
-	}
-	if autoInject {
 		<-syncSignal
 	}
 	close(syncSignal) // 关闭同步管道
-	//logging.Warn("30s后启动wcf客户端，请确保登录微信")
-	//time.Sleep(30 * time.Second)
 	wxclient, err := wcf.NewWCF(addr)
 	if err != nil {
 		logging.Fatal(fmt.Errorf("new wcf err: %w", err).Error(), 1001)
@@ -116,7 +127,7 @@ func (c *Client) IsLogin() bool {
 	return c.wxClient.IsLogin()
 }
 
-// GetMsg 获取消息 !!!不推荐使用!!!
+// GetMsg 获取消息 !!!不推荐使用!!!（请使用管道获取消息）
 // Deprecated
 func (c *Client) GetMsg() (*Message, error) {
 	if !c.wxClient.IsLogin() {

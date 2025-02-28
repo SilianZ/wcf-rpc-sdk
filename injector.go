@@ -105,7 +105,7 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 				logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
 				waitingSignal(ctx, cancel)
 				callFunc(funcDestroy, "SDK destroy", debug, port)
-				_ = gblDll.Release()
+				_ = gblDll.Release() // test 有概率主进程退出而dll没有释放
 				return
 			}
 		}
