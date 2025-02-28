@@ -188,4 +188,5 @@ func (cm *CacheUserManager) Close() {
 	cm.friendCount = 0
 	cm.roomCount = 0
 	cm.memberCount = 0
+	logging.Warn("【wcf】close user cache")
 }

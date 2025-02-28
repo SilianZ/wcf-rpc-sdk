@@ -55,6 +55,7 @@ func (c *Client) Close() {
 			logging.ErrorWithErr(err, "停止wcf客户端发生了错误")
 		}
 	})
+	logging.Warn("wcf-sdk closed!")
 }
 
 // NewClient <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
