@@ -59,23 +59,22 @@ func (c *Client) Close() {
 
 // NewClient <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
 func NewClient(msgChanSize int, autoInject bool, sdkDebug bool) *Client {
-	ctx := context.Background()
-	return newClient(ctx, msgChanSize, autoInject, sdkDebug)
+	ctx, cancel := context.WithCancel(context.Background())
+	return newClient(ctx, cancel, msgChanSize, autoInject, sdkDebug)
 }
 
-// NewClientWithCtx <上下文> <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
-func NewClientWithCtx(ctx context.Context, msgChanSize int, autoInject bool, sdkDebug bool) *Client {
+// NewClientWithCtx <上下文> <退出方法> <消息通道大小> <是否自动注入微信（自动打开微信）> <是否开启sdk-debug>
+func NewClientWithCtx(ctx context.Context, cancel context.CancelFunc, msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 	if ctx == nil {
 		panic("ctx is nil")
 	}
-	return newClient(ctx, msgChanSize, autoInject, sdkDebug)
+	return newClient(ctx, cancel, msgChanSize, autoInject, sdkDebug)
 }
 
-func newClient(ctx context.Context, msgChanSize int, autoInject bool, sdkDebug bool) *Client {
+func newClient(ctx context.Context, cancel context.CancelFunc, msgChanSize int, autoInject bool, sdkDebug bool) *Client {
 	addr := env.Name(ENVTcpAddr).StringOrElse(DefaultTcpAddr) // "tcp://127.0.0.1:10086"
-	ctx, cancel := context.WithCancel(ctx)
-	var syncSignal = make(chan struct{}) // 同步信号 确保注入后处理消息
-	if autoInject {                      // 自动注入
+	var syncSignal = make(chan struct{})                      // 同步信号 确保注入后处理消息
+	if autoInject {                                           // 自动注入
 		port, err := strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
 		if err != nil {
 			logging.ErrorWithErr(err, "the port is invalid, please check your address")
