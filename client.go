@@ -82,7 +82,7 @@ func newClient(ctx context.Context, cancel context.CancelFunc, msgChanSize int, 
 		}
 
 		go func() {
-			Inject(ctx, port, sdkDebug, syncSignal) // 调用sdk.dll 注入&启动微信
+			Inject(ctx, cancel, port, sdkDebug, syncSignal) // 调用sdk.dll 注入&启动微信
 		}()
 		<-syncSignal
 	}

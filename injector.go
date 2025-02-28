@@ -58,7 +58,7 @@ func callFunc(funName string, title string, debug bool, port int) {
 }
 
 /** 监听并等待SIGINT信号 */
-func waitingSignal(ctx context.Context, cancel context.CancelFunc) {
+func waitingSignal(ctx context.Context) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	logging.Info("Is running, press Ctrl+C to quit.")
@@ -66,13 +66,12 @@ func waitingSignal(ctx context.Context, cancel context.CancelFunc) {
 	case <-ctx.Done():
 		logging.Info("Context cancelled, exiting.")
 	case <-sigChan:
-		cancel()
 		logging.Info("Signal received, exiting.")
 	}
 	logging.Info("Stopped!")
 }
 
-func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
+func Inject(ctx context.Context, cancel context.CancelFunc, port int, debug bool, syncChan chan struct{}) {
 	logging.Warn("自动注入中...", map[string]interface{}{"hint": "请检查是否安装对应微信3.9.11.25版本，如未安装请前往地址下载&安装", "wechatSetUpUrl": "https://github.com/lich0821/WeChatFerry/releases/download/v39.3.5/WeChatSetup-3.9.11.25.exe"})
 	logging.Info("debug 模式状态", map[string]interface{}{"debug": debug})
 	// 加载调用库
@@ -92,8 +91,7 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 	logging.Info(fmt.Sprintf("Set sdk port: %d, debug: %t", port, debug))
 
 	startAt := time.Now()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	defer cancel() // 通知外层退出
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,9 +101,9 @@ func Inject(ctx context.Context, port int, debug bool, syncChan chan struct{}) {
 			if tryInject(debug, port) {
 				syncChan <- struct{}{} // 注入成功通知
 				logging.Info(fmt.Sprintf("SDK inject success. Time used: %f", time.Now().Sub(startAt).Seconds()))
-				waitingSignal(ctx, cancel)
+				waitingSignal(ctx)
 				callFunc(funcDestroy, "SDK destroy", debug, port)
-				_ = gblDll.Release() // test 有概率主进程退出而dll没有释放
+				_ = gblDll.Release()
 				return
 			}
 		}
