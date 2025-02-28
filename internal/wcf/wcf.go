@@ -50,7 +50,6 @@ func (c *Client) Recv() (*Response, error) {
 
 // Close 退出
 func (c *Client) Close() error {
-	c.DisableRecvTxt()
 	return c.socket.Close()
 }
 
