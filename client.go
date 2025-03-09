@@ -187,6 +187,8 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	} else { // 不是群组消息
 		msg.Roomid = "" // 置空
 	}
+	rd := &RoomData{Members: roomMembers}
+	rd.AnalyseMemberAt(*c.GetSelfInfo(), msg.Content)
 
 	m := &Message{
 		IsSelf:    msg.IsSelf,
@@ -196,7 +198,7 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 		Type:      MsgType(msg.Type),
 		Ts:        msg.Ts,
 		RoomId:    msg.Roomid,
-		RoomData:  &RoomData{Members: roomMembers},
+		RoomData:  rd,
 		Content:   msg.Content,
 		WxId:      msg.Sender,
 		Sign:      msg.Sign,

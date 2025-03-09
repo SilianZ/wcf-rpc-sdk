@@ -11,6 +11,7 @@ import (
 	"github.com/Clov614/logging"
 	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -224,7 +225,37 @@ type ChatRoom struct { // 群聊
 }
 
 type RoomData struct {
-	Members []*ContactInfo `json:"members,omitempty"` // 成员列表
+	Members       []*ContactInfo `json:"members,omitempty"`     // 成员列表
+	AtedMSequence []*ContactInfo `json:"at_sequence,omitempty"` // 被艾特的顺序
+	IsAtSelf      bool           `json:"is_at_self"`            // 是否艾特自己
+}
+
+// AnalyseMemberAt 检查并生成成员@情况
+func (rd *RoomData) AnalyseMemberAt(self Self, content string) {
+	if rd.Members == nil || len(rd.Members) == 0 {
+		return
+	}
+	var atedMSequence []*ContactInfo
+	// 获取消息中艾特成员的成员名
+	re := regexp.MustCompile(`@([^\s]+?) `)
+	matches := re.FindAllStringSubmatch(content, -1)
+	atNameList := make([]string, len(matches))
+	atedMSequence = make([]*ContactInfo, len(matches))
+	for i, match := range matches {
+		if len(match) > 1 {
+			atNameList[i] = match[1]
+			// 检查 msg.RoomData 是否为 nil
+			infos, err := rd.GetMembersByNickName(match[1])
+			if err != nil {
+				logging.WarnWithErr(err, "RoomData.GetMembersByNickName fail")
+				continue
+			}
+			atedMSequence[i] = infos[0]
+			if self.Wxid == infos[0].Wxid {
+				rd.IsAtSelf = true
+			}
+		}
+	}
 }
 
 func (rd *RoomData) GetMembers(wxidList ...string) ([]*ContactInfo, error) {
