@@ -188,7 +188,7 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 		msg.Roomid = "" // 置空
 	}
 	rd := &RoomData{Members: roomMembers}
-	rd.AnalyseMemberAt(*c.GetSelfInfo(), msg.Content)
+	rd.AnalyseMemberAt(c.GetSelfWxId(), msg.Content)
 
 	m := &Message{
 		IsSelf:    msg.IsSelf,
@@ -497,7 +497,7 @@ func (c *Client) GetSelfWxId() string {
 	if c.self == nil || c.self.Wxid == "" {
 		c.GetSelfInfo() // 更新缓存
 	}
-	if c.self == nil {
+	if c.self == nil || c.self.Wxid == "" {
 		return ""
 	}
 	return c.self.Wxid

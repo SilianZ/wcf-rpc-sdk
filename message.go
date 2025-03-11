@@ -231,7 +231,11 @@ type RoomData struct {
 }
 
 // AnalyseMemberAt 检查并生成成员@情况
-func (rd *RoomData) AnalyseMemberAt(self Self, content string) {
+func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
+	if selfWxid == "" {
+		logging.Error("analyse member at wxid error", map[string]interface{}{"wxid": selfWxid})
+		return
+	}
 	if rd.Members == nil || len(rd.Members) == 0 {
 		return
 	}
@@ -251,7 +255,7 @@ func (rd *RoomData) AnalyseMemberAt(self Self, content string) {
 				continue
 			}
 			atedMSequence[i] = infos[0]
-			if self.Wxid == infos[0].Wxid {
+			if selfWxid == infos[0].Wxid { // fixme: 可能的空指针错误
 				rd.IsAtSelf = true
 			}
 		}
