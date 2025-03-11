@@ -251,6 +251,9 @@ func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
 			infos, err := rd.GetMembersByNickName(match[1])
 			if err != nil || infos[0] == nil {
 				logging.WarnWithErr(err, "RoomData.GetMembersByNickName fail")
+				if infos[0] == nil {
+					logging.Warn("群成员设置群昵称 无法判断艾特")
+				}
 				continue
 			}
 			rd.AtedMSequence[i] = infos[0]

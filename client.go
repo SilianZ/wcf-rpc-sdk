@@ -6,16 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
+	roomdata "github.com/Clov614/wcf-rpc-sdk/internal/proto"
 	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
 	"github.com/antchfx/xmlquery"
 	"github.com/eatmoreapple/env"
 	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/proto"
 	"html"
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -451,16 +452,18 @@ func (c *Client) GetRoomMemberID(roomId string) ([]string, error) {
 		return nil, fmt.Errorf("no room data found for roomId: %s", roomId)
 	}
 
-	decodedString := string(contacts[0].GetFields()[0].Content)
-	logging.Debug("GetRoomMemberID", map[string]interface{}{"roomId": roomId, "decodedString": decodedString}) // 打印解码后的字符串
+	roomDataBytes := contacts[0].GetFields()[0].Content
 
-	// 使用正则表达式提取 wxid
-	re := regexp.MustCompile(`(wxid_[a-zA-Z0-9]+)`)
-	matches := re.FindAllStringSubmatch(decodedString, -1)
+	roomData := &roomdata.RoomData{}
+
+	err := proto.Unmarshal(roomDataBytes, roomData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RoomData: %w", err)
+	}
 
 	var wxids []string
-	for _, match := range matches {
-		wxids = append(wxids, match[1])
+	for _, member := range roomData.GetMembers() {
+		wxids = append(wxids, member.GetWxid())
 	}
 
 	return wxids, nil
@@ -791,50 +794,50 @@ func (c *Client) getAllMember() *[]*ContactInfo {
 				cInfo.Wxid = string(field.Content)
 			case "Alias":
 				cInfo.Alias = string(field.Content)
-			//case "DelFlag":
-			//	if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
-			//		cInfo.DelFlag = uint8(num)
-			//	} else {
-			//		logging.WarnWithErr(err, "error parsing DelFlag")
-			//		cInfo.DelFlag = 0 // todo 或者其他默认值
-			//	}
-			//case "Type":
-			//	if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
-			//		cInfo.ContactType = uint8(num)
-			//	} else {
-			//		cInfo.ContactType = 0
-			//	}
+			case "DelFlag":
+				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+					cInfo.DelFlag = uint8(num)
+				} else {
+					logging.WarnWithErr(err, "error parsing DelFlag")
+					cInfo.DelFlag = 0 // todo 或者其他默认值
+				}
+			case "Type":
+				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+					cInfo.ContactType = uint8(num)
+				} else {
+					cInfo.ContactType = 0
+				}
 			case "Remark":
 				cInfo.Remark = string(field.Content)
 			case "NickName":
 				cInfo.NickName = string(field.Content)
-				//case "PYInitial":
-				//	cInfo.PyInitial = string(field.Content)
-				//case "QuanPin":
-				//	cInfo.QuanPin = string(field.Content)
-				//case "RemarkPYInitial":
-				//	cInfo.RemarkPyInitial = string(field.Content)
-				//case "RemarkQuanPin":
-				//	cInfo.RemarkQuanPin = string(field.Content)
-				//case "SmallHeadImgUrl":
-				//	cInfo.SmallHeadURL = string(field.Content)
-				//case "BigHeadImgUrl":
-				//	cInfo.BigHeadURL = string(field.Content)
-				//}
+			case "PYInitial":
+				cInfo.PyInitial = string(field.Content)
+			case "QuanPin":
+				cInfo.QuanPin = string(field.Content)
+			case "RemarkPYInitial":
+				cInfo.RemarkPyInitial = string(field.Content)
+			case "RemarkQuanPin":
+				cInfo.RemarkQuanPin = string(field.Content)
+			case "SmallHeadImgUrl":
+				cInfo.SmallHeadURL = string(field.Content)
+			case "BigHeadImgUrl":
+				cInfo.BigHeadURL = string(field.Content)
 			}
-			//	// 查询小头像和大头像
-			//	if cInfo.Wxid != "" {
-			//		query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
-			//		for _, row := range query {
-			//			for _, field := range row.Fields {
-			//				switch field.Column {
-			//				case "smallHeadImgUrl":
-			//					cInfo.SmallHeadURL = string(field.Content)
-			//				case "bigHeadImgUrl":
-			//					cInfo.BigHeadURL = string(field.Content)
-			//				}
-			//			}
-			//		}
+		}
+		// 查询小头像和大头像
+		if cInfo.Wxid != "" {
+			query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
+			for _, row := range query {
+				for _, field := range row.Fields {
+					switch field.Column {
+					case "smallHeadImgUrl":
+						cInfo.SmallHeadURL = string(field.Content)
+					case "bigHeadImgUrl":
+						cInfo.BigHeadURL = string(field.Content)
+					}
+				}
+			}
 		}
 		memberList = append(memberList, cInfo)
 	}
