@@ -249,12 +249,12 @@ func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
 			atNameList[i] = match[1]
 			// 检查 msg.RoomData 是否为 nil
 			infos, err := rd.GetMembersByNickName(match[1])
-			if err != nil {
+			if err != nil || infos[0] == nil {
 				logging.WarnWithErr(err, "RoomData.GetMembersByNickName fail")
 				continue
 			}
 			rd.AtedMSequence[i] = infos[0]
-			if selfWxid == infos[0].Wxid { // fixme: 可能的空指针错误
+			if selfWxid == infos[0].Wxid {
 				rd.IsAtSelf = true
 			}
 		}
