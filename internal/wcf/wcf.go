@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Client struct {
@@ -19,6 +20,7 @@ type Client struct {
 	RecvTxt            bool
 	ContactsMap        []map[string]string
 	MessageCallbackUrl string
+	mu                 sync.Mutex
 }
 
 func (c *Client) conn() error {
@@ -35,11 +37,15 @@ func (c *Client) conn() error {
 }
 
 func (c *Client) send(data []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.socket.Send(data)
 }
 
 func (c *Client) Recv() (*Response, error) {
 	msg := &Response{}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	recv, err := c.socket.Recv()
 	if err != nil {
 		return msg, err
@@ -50,6 +56,8 @@ func (c *Client) Recv() (*Response, error) {
 
 // Close 退出
 func (c *Client) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.socket.Close()
 }
 

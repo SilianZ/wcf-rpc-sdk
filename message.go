@@ -239,12 +239,11 @@ func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
 	if rd.Members == nil || len(rd.Members) == 0 {
 		return
 	}
-	var atedMSequence []*ContactInfo
 	// 获取消息中艾特成员的成员名
 	re := regexp.MustCompile(`@([^\s]+?) `)
 	matches := re.FindAllStringSubmatch(content, -1)
 	atNameList := make([]string, len(matches))
-	atedMSequence = make([]*ContactInfo, len(matches))
+	rd.AtedMSequence = make([]*ContactInfo, len(matches))
 	for i, match := range matches {
 		if len(match) > 1 {
 			atNameList[i] = match[1]
@@ -254,7 +253,7 @@ func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
 				logging.WarnWithErr(err, "RoomData.GetMembersByNickName fail")
 				continue
 			}
-			atedMSequence[i] = infos[0]
+			rd.AtedMSequence[i] = infos[0]
 			if selfWxid == infos[0].Wxid { // fixme: 可能的空指针错误
 				rd.IsAtSelf = true
 			}
@@ -307,6 +306,9 @@ func (rd *RoomData) GetMembersByNickName(nicknameList ...string) ([]*ContactInfo
 	}
 	for i, nickname := range nicknameList {
 		for _, member := range rd.Members {
+			if member == nil {
+				continue
+			}
 			if member.NickName == nickname {
 				contactInfoList[i] = member
 			}

@@ -33,14 +33,15 @@ var (
 )
 
 type Client struct {
-	ctx       context.Context
-	stop      context.CancelFunc
-	msgBuffer *MessageBuffer
-	wxClient  *wcf.Client
-	addr      string // 接口地址
-	self      *Self
-	cacheUser *CacheUserManager // 用户信息缓存
-	closeOnce sync.Once
+	ctx        context.Context
+	stop       context.CancelFunc
+	msgBuffer  *MessageBuffer
+	wxClient   *wcf.Client
+	addr       string // 接口地址
+	self       *Self
+	cacheUser  *CacheUserManager // 用户信息缓存
+	closeOnce  sync.Once
+	memberLock sync.Mutex // 查询member操作互斥锁
 }
 
 // Close 停止客户端
@@ -119,8 +120,8 @@ func (c *Client) Run(debug bool) {
 			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)
 		}
 	}()
-	go c.cyclicUpdateSelfInfo(true)  // 启动定时更新
-	go c.cyclicUpdateCacheInfo(true) // 启动定时更新
+	go c.cyclicUpdateSelfInfo(false)  // 启动定时更新
+	go c.cyclicUpdateCacheInfo(false) // 启动定时更新
 }
 
 func (c *Client) IsLogin() bool {
@@ -159,6 +160,7 @@ func (c *Client) handleMsg(ctx context.Context) (err error) {
 		return nil
 	}
 	go func() {
+		//c.wxClient.DisableRecvTxt()          // 重置可能的状态
 		c.wxClient.EnableRecvTxt()           // 允许接收消息
 		err = c.wxClient.OnMSG(ctx, handler) // 当消息到来时，处理消息
 		if err != nil {
@@ -556,12 +558,13 @@ func isNil(i interface{}) bool {
 }
 
 func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(id string, isAll bool, t InfoType) (interface{}, error)) (interface{}, error) {
-	result, err := f(wxid, isAll, t)
+	result, err := f(wxid, isAll, t) // 缓存中尝试获取
 
-	if retry > 0 && isNil(result) {
+	if retry > 0 && isNil(result) { // 未命中缓存情况
 		if t == memberType {
 			if c.cacheUser.memberCount != 0 {
 				c.updateCacheInfo(true, retry <= 0, true)
+				return result, err
 			}
 			c.updateCacheInfo(true, retry <= 0, false)
 		} else {
@@ -619,9 +622,10 @@ func (c *Client) GetAllChatRoom() (*ChatRoomList, error) {
 func (c *Client) GetMember(wxidList ...string) ([]*ContactInfo, error) {
 	var result = make([]*ContactInfo, 0, len(wxidList))
 	for _, wxid := range wxidList {
-		info, err := c.getInfo(wxid, false, memberType, 3, c.cacheUser.Get)
+		info, err := c.getInfo(wxid, false, memberType, 1, c.cacheUser.Get)
 		if err != nil {
-			logging.ErrorWithErr(err, "get member by wxid err")
+			logging.Debug("GetMember by wxid err", map[string]interface{}{"err": err.Error()})
+			result = append(result, nil)
 			continue
 		}
 		result = append(result, info.(*ContactInfo))
@@ -667,20 +671,23 @@ func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool, async bool) {
 		return
 	}
 	group := sync.WaitGroup{}
-	if async {
+	if !async {
 		group.Add(1)
 	}
 	go func() {
-		if async {
+		if !async {
 			defer group.Done()
 		}
 		contacts := c.wxClient.GetContacts()
 		if len(contacts) == 0 {
-			logging.ErrorWithErr(ErrNull, "get contacts err")
+			logging.Debug("get contacts err", map[string]interface{}{"err": ErrNull.Error()})
 			return
 		}
 		if IsGetMember {
-			c.cacheUser.UpdateMembers(c.getAllMember()) // 查询数据库获取全部联系人并更新
+			allMember := c.getAllMember()
+			if allMember != nil {
+				c.cacheUser.UpdateMembers(allMember) // 查询数据库获取全部联系人并更新
+			}
 		}
 		for _, contact := range contacts {
 			user := c.getUser(contact)
@@ -730,7 +737,7 @@ func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool, async bool) {
 			}
 		}
 	}()
-	if async {
+	if !async {
 		group.Wait()
 	}
 }
@@ -766,6 +773,10 @@ func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
 
 // getAllMember 获取所有的联系人（包括群聊中的陌生群成员）
 func (c *Client) getAllMember() *[]*ContactInfo {
+	if !c.memberLock.TryLock() {
+		return nil
+	}
+	defer c.memberLock.Unlock()
 	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "select * from Contact;")
 	if len(contacts) == 0 {
 		logging.Error("client.getAllMember: contact not found")
