@@ -40,9 +40,9 @@ func TestClient_SendTextAndGetMsg(t *testing.T) {
 	}
 
 	// 测试 GetMsg
-	msg, err := client.GetMsg()
-	if err != nil {
-		t.Fatalf("接收消息失败: %v", err)
+	msg, b := <-client.GetMsgChan()
+	if !b {
+		t.Error("chan closed!!")
 	}
 
 	// 打印接收到的消息
@@ -102,7 +102,7 @@ func TestClient_GetContacts(t *testing.T) {
 
 }
 
-func TestClient_GetRoomMemberID(t *testing.T) {
+func TestClient_GetRoomMembers(t *testing.T) {
 	// 创建客户端实例
 	client := NewClient(10, false, false)
 
@@ -111,13 +111,31 @@ func TestClient_GetRoomMemberID(t *testing.T) {
 	defer client.Close()
 
 	roomId := "45959390469@chatroom"
-	wxids, err := client.GetRoomMemberID(roomId)
+	roomMembers, err := client.RoomMembers(roomId)
 	if err != nil {
 		t.Fatalf("GetRoomMemberID failed: %v", err)
 	}
 
 	// 打印解码后的字符串
-	t.Logf("Decoded string for roomId %s: %v", roomId, wxids)
+	t.Logf("Decoded string for roomId %s: %v", roomId, roomMembers)
+}
+
+func TestClient_QueryRoomTable(t *testing.T) {
+	c := NewClient(10, false, false)
+	defer c.Close()
+	c.Run(true)
+	roomId := "45959390469@chatroom"
+	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT * FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
+	t.Log(contacts)
+}
+
+func TestClient_ChatRoomOwner(t *testing.T) {
+	c := NewClient(10, false, false)
+	defer c.Close()
+	c.Run(true)
+	roomId := "45959390469@chatroom"
+	owner := c.ChatRoomOwner(roomId)
+	t.Logf("%#v", owner)
 }
 
 func TestClient_GetSelfInfo(t *testing.T) {
@@ -128,7 +146,10 @@ func TestClient_GetSelfInfo(t *testing.T) {
 	client.Run(true)
 	defer client.Close()
 
-	info := client.GetSelfInfo()
+	info, ok := client.GetSelfInfo()
+	if !ok {
+		t.Errorf("GetSelfInfo failed: %v", info)
+	}
 	t.Logf("%#v", info)
 }
 
@@ -140,7 +161,10 @@ func TestClient_GetSelfName(t *testing.T) {
 	client.Run(false)
 	defer client.Close()
 
-	name := client.GetSelfName()
+	name, ok := client.GetSelfName()
+	if !ok {
+		t.Errorf("GetSelfName failed: %v", name)
+	}
 	t.Logf("Self Name: %s", name)
 }
 
@@ -152,81 +176,84 @@ func TestClient_GetSelfWxId(t *testing.T) {
 	client.Run(false)
 	defer client.Close()
 
-	wxid := client.GetSelfWxId()
+	wxid, ok := client.GetSelfWxId()
+	if !ok {
+		t.Errorf("GetSelfWxId failed: %v", wxid)
+	}
 	t.Logf("Self WxId: %s", wxid)
 }
 
-func TestClient_GetFriend(t *testing.T) {
-	// 创建客户端实例
-	client := NewClient(10, false, false)
+//func TestClient_GetFriend(t *testing.T) {
+//	// 创建客户端实例
+//	client := NewClient(10, false, false)
+//
+//	// 启动客户端
+//	client.Run(false)
+//	defer client.Close()
+//
+//	// 假设 "filehelper" 是一个已知的好友
+//	friend, err := client.GetFriend("wxid_pagpb98c6nj722")
+//	if err != nil {
+//		t.Fatalf("getFriend failed: %v", err)
+//	}
+//
+//	t.Logf("Friend Info: %#v", friend)
+//}
 
-	// 启动客户端
-	client.Run(false)
-	defer client.Close()
+//func TestClient_GetAllFriend(t *testing.T) {
+//	// 创建客户端实例
+//	client := NewClient(10, false, false)
+//
+//	// 启动客户端
+//	client.Run(true)
+//	defer client.Close()
+//
+//	friends, err := client.GetAllFriend()
+//	if err != nil {
+//		t.Fatalf("getAllFriend failed: %v", err)
+//	}
+//
+//	for _, friend := range *friends {
+//		t.Logf("Friend Info: %#v", friend)
+//	}
+//}
 
-	// 假设 "filehelper" 是一个已知的好友
-	friend, err := client.GetFriend("wxid_pagpb98c6nj722")
-	if err != nil {
-		t.Fatalf("getFriend failed: %v", err)
-	}
+//func TestClient_GetChatRoom(t *testing.T) {
+//	// 创建客户端实例
+//	client := NewClient(10, false, false)
+//
+//	// 启动客户端
+//	client.Run(false)
+//	defer client.Close()
+//
+//	// 假设 "45959390469@chatroom" 是一个已知的群聊
+//	chatroom := client.GetMember("45959390469@chatroom", true)
+//	if chatroom == nil {
+//		t.Fatalf("GetChatRoom failed: %v", chatroom)
+//	}
+//
+//	t.Logf("ChatRoom Info: %#v", *chatroom)
+//	t.Logf("ChatRoom RoomData: %#v", *chatroom.RoomData)
+//	t.Logf("ChatRoom RoomHeadImgURL: %#v", *chatroom.RoomHeadImgURL)
+//}
 
-	t.Logf("Friend Info: %#v", friend)
-}
-
-func TestClient_GetAllFriend(t *testing.T) {
-	// 创建客户端实例
-	client := NewClient(10, false, false)
-
-	// 启动客户端
-	client.Run(true)
-	defer client.Close()
-
-	friends, err := client.GetAllFriend()
-	if err != nil {
-		t.Fatalf("getAllFriend failed: %v", err)
-	}
-
-	for _, friend := range *friends {
-		t.Logf("Friend Info: %#v", friend)
-	}
-}
-
-func TestClient_GetChatRoom(t *testing.T) {
-	// 创建客户端实例
-	client := NewClient(10, false, false)
-
-	// 启动客户端
-	client.Run(false)
-	defer client.Close()
-
-	// 假设 "45959390469@chatroom" 是一个已知的群聊
-	chatroom, err := client.GetChatRoom("45959390469@chatroom")
-	if err != nil {
-		t.Fatalf("getChatRoom failed: %v", err)
-	}
-
-	t.Logf("ChatRoom Info: %#v", *chatroom)
-	t.Logf("ChatRoom RoomData: %#v", *chatroom.RoomData)
-	t.Logf("ChatRoom RoomHeadImgURL: %#v", *chatroom.RoomHeadImgURL)
-}
-
-func TestClient_GetAllChatRoom(t *testing.T) {
-	// 创建客户端实例
-	client := NewClient(10, false, false)
-
-	// 启动客户端
-	client.Run(true)
-	defer client.Close()
-
-	chatrooms, err := client.GetAllChatRoom()
-	if err != nil {
-		t.Fatalf("getAllChatRoom failed: %v", err)
-	}
-
-	for _, chatroom := range *chatrooms {
-		t.Logf("ChatRoom Info: %#v", chatroom)
-	}
-}
+//func TestClient_GetAllChatRoom(t *testing.T) {
+//	// 创建客户端实例
+//	client := NewClient(10, false, false)
+//
+//	// 启动客户端
+//	client.Run(true)
+//	defer client.Close()
+//
+//	chatrooms, err := client.GetAllChatRoom()
+//	if err != nil {
+//		t.Fatalf("getAllChatRoom failed: %v", err)
+//	}
+//
+//	for _, chatroom := range *chatrooms {
+//		t.Logf("ChatRoom Info: %#v", chatroom)
+//	}
+//}
 
 func TestClient_ReplyText(t *testing.T) {
 	// 创建客户端实例
@@ -236,15 +263,15 @@ func TestClient_ReplyText(t *testing.T) {
 	client.Run(true)
 	defer client.Close()
 
-	msg, err := client.GetMsg()
-	if err != nil {
-		t.Error("接收消息失败:", err.Error())
+	msg, b := <-client.GetMsgChan()
+	if !b {
+		t.Error("chan closed!!")
 	}
 	t.Logf("收到消息: %+v\n", msg)
 
 	// 如果是文本消息，则回复
 	if msg.Content == "ping" {
-		err = msg.ReplyText("pong")
+		err := msg.ReplyText("pong")
 		if err != nil {
 			t.Error("回复消息错误", err)
 		}
@@ -259,9 +286,9 @@ func TestClient_IsSendByFriend(t *testing.T) {
 	client.Run(false)
 	defer client.Close()
 
-	msg, err := client.GetMsg()
-	if err != nil {
-		t.Error("接收消息失败:", err.Error())
+	msg, b := <-client.GetMsgChan()
+	if !b {
+		t.Error("chan closed!!")
 	}
 	t.Logf("收到消息: %+v\n", msg)
 	if nil != msg {
@@ -272,7 +299,7 @@ func TestClient_IsSendByFriend(t *testing.T) {
 	}
 }
 
-func TestClient_GetMember(t *testing.T) {
+func TestClient_GetMemberByCache(t *testing.T) {
 	// 创建客户端实例
 	client := NewClient(10, false, false)
 
@@ -281,14 +308,29 @@ func TestClient_GetMember(t *testing.T) {
 	defer client.Close()
 
 	// 假设 "wxid_xxx" 是一个已知的成员
-	memberList, err := client.GetMember("45959390469@chatroom") // 45959390469@chatroom wxid_qyutq6wnee2f22
-	if err != nil {
-		t.Fatalf("getMember failed: %v", err)
-	}
+	member := client.GetMember("45959390469@chatroom", true) // 45959390469@chatroom wxid_qyutq6wnee2f22
 
-	for _, member := range memberList {
-		t.Logf("Member Info: %#v", member)
+	if member.Wxid == "" {
+		t.Errorf("GetMember failed: %v", member)
 	}
+	t.Logf("GetMember Info: %#v", member)
+}
+
+func TestClient_GetMemberDirectly(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	//client.Run(false)
+	defer client.Close()
+
+	// 假设 "wxid_xxx" 是一个已知的成员
+	member := client.GetMember("45959390469@chatroom", false) // 45959390469@chatroom wxid_qyutq6wnee2f22
+
+	if member.Wxid == "" {
+		t.Errorf("GetMember failed: %v", member)
+	}
+	t.Logf("GetMember Info: %#v", member)
 }
 
 func TestClient_GetAllMember(t *testing.T) {
@@ -299,9 +341,9 @@ func TestClient_GetAllMember(t *testing.T) {
 	client.Run(true)
 	defer client.Close()
 
-	members, err := client.GetAllMember()
-	if err != nil {
-		t.Fatalf("getAllMember failed: %v", err)
+	members := client.getAllMember()
+	if members == nil || len(*members) == 0 {
+		t.Errorf("GetAllMember failed: %v", members)
 	}
 
 	t.Log("members: ", members)
@@ -344,10 +386,13 @@ func TestClient_GetSelfFileStoragePath(t *testing.T) {
 	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false)
+	//client.Run(false)
 	defer client.Close()
 
-	fileStoragePath := client.GetSelfFileStoragePath()
+	fileStoragePath, ok := client.GetSelfFileStoragePath()
+	if !ok {
+		t.Fatalf("client.GetSelfFileStoragePath failed: %v", ok)
+	}
 	t.Logf("Self FileStoragePath: %s", fileStoragePath)
 }
 
@@ -393,7 +438,7 @@ func TestClient_SendImage(t *testing.T) {
 	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false)
+	//client.Run(false)
 	defer client.Close()
 
 	// 等待客户端启动完成
@@ -436,7 +481,7 @@ func TestClient_getAllMember(t *testing.T) {
 	client := NewClient(10, false, false)
 
 	// 启动客户端
-	client.Run(false)
+	//client.Run(true)
 	defer client.Close()
 	var flag = false
 	infos := *client.getAllMember()
@@ -451,4 +496,15 @@ func TestClient_getAllMember(t *testing.T) {
 		t.Fail()
 	}
 
+}
+
+func TestClient_updateCacheInfo(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	//client.Run(true)
+	defer client.Close()
+
+	client.updateCacheInfo(false)
 }

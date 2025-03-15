@@ -31,6 +31,7 @@ type meta struct {
 	rawMsg *Message
 	sender string
 	cli    *Client
+	self   *Self
 }
 
 // ReplyText 回复文本
@@ -53,8 +54,7 @@ func (m *meta) IsSendByFriend() bool {
 	if m.rawMsg.IsSelf {
 		return false
 	}
-	friend, _ := m.cli.GetFriend(m.rawMsg.WxId) // todo 这边本意是区分群聊、公众号、好友 但是群聊消息中的wxId不为空，当前意思是判断是否好友的消息
-	return friend != nil
+	return m.self.IsSendByFriend(m.rawMsg.WxId) // todo 这边本意是区分群聊、公众号、好友 但是群聊消息中的wxId不为空，当前意思是判断是否好友的消息
 }
 
 type Message struct {
@@ -203,17 +203,10 @@ type User struct {
 	Gender   GenderType `json:"gender,omitempty"` // 性别
 }
 
-type Self struct { // 机器人自己
-	User
-	Mobile          string `json:"mobile,omitempty"` // 个人信息时携带
-	Home            string `json:"home,omitempty"`   // C:/Users/Administrator/Documents/WeChat Files/
-	FileStoragePath string `json:"fileStoragePath"`  // C:/Users/Administrator/Documents/WeChat Files/wxid_p5z4fuhnbdgs22/FileStorage/
-}
-
-// FriendList 联系人
-type FriendList []*Friend
-type ChatRoomList []*ChatRoom
-type GhList []*GH
+// FriendMp 联系人
+type FriendMp map[string]Friend
+type ChatRoomMp map[string]ChatRoom
+type GHMp map[string]GH
 
 type Friend User
 type ChatRoom struct { // 群聊
@@ -251,13 +244,10 @@ func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
 			infos, err := rd.GetMembersByNickName(match[1])
 			if err != nil || infos[0] == nil {
 				logging.WarnWithErr(err, "RoomData.GetMembersByNickName fail")
-				if infos[0] == nil {
-					logging.Warn("群成员设置群昵称 无法判断艾特")
-				}
 				continue
 			}
 			rd.AtedMSequence[i] = infos[0]
-			if selfWxid == infos[0].Wxid {
+			if selfWxid == infos[0].Wxid { // 艾特自身判断
 				rd.IsAtSelf = true
 			}
 		}
@@ -302,25 +292,26 @@ func (rd *RoomData) GetMembersNickNameById(wxidList ...string) ([]string, error)
 	return nicknameList, nil
 }
 
-func (rd *RoomData) GetMembersByNickName(nicknameList ...string) ([]*ContactInfo, error) {
-	var contactInfoList = make([]*ContactInfo, len(nicknameList))
-	if len(nicknameList) == 0 {
+// GetMembersByNickName 根据用户昵称或者群昵称取对象
+func (rd *RoomData) GetMembersByNickName(nameL ...string) ([]*ContactInfo, error) {
+	var res = make([]*ContactInfo, len(nameL))
+	if len(nameL) == 0 {
 		return nil, ErrNull
 	}
-	for i, nickname := range nicknameList {
-		for _, member := range rd.Members {
-			if member == nil {
+	for i, nickname := range nameL {
+		for _, m := range rd.Members {
+			if m == nil {
 				continue
 			}
-			if member.NickName == nickname {
-				contactInfoList[i] = member
+			if m.NickName == nickname || m.Alias == nickname {
+				res[i] = m
 			}
 		}
 	}
-	if len(contactInfoList) == 0 {
+	if len(res) == 0 {
 		return nil, ErrNull
 	}
-	return contactInfoList, nil
+	return res, nil
 }
 
 type ContactInfo struct {

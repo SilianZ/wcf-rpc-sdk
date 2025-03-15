@@ -34,23 +34,23 @@ var (
 )
 
 type Client struct {
-	ctx        context.Context
-	stop       context.CancelFunc
-	msgBuffer  *MessageBuffer
-	wxClient   *wcf.Client
-	addr       string // 接口地址
-	self       *Self
-	cacheUser  *CacheUserManager // 用户信息缓存
-	closeOnce  sync.Once
-	memberLock sync.Mutex // 查询member操作互斥锁
+	ctx         context.Context
+	stop        context.CancelFunc
+	msgBuffer   *MessageBuffer
+	wxClient    *wcf.Client
+	addr        string // 接口地址
+	self        *Self
+	cacheMember *ContactInfoManager // 用户信息缓存 fixme: 更改命名
+	closeOnce   sync.Once
+	memberLock  sync.Mutex // 查询member操作互斥锁
 }
 
 // Close 停止客户端
 func (c *Client) Close() {
 	c.closeOnce.Do(func() {
 		c.stop()
-		if c.cacheUser != nil {
-			c.cacheUser.Close() // 释放信息缓存
+		if c.cacheMember != nil {
+			c.cacheMember.Close() // 释放信息缓存
 		}
 		err := c.wxClient.Close()
 		if err != nil {
@@ -96,12 +96,13 @@ func newClient(ctx context.Context, cancel context.CancelFunc, msgChanSize int, 
 		//panic(err)
 	}
 	return &Client{
-		ctx:       ctx,
-		stop:      cancel,
-		msgBuffer: NewMessageBuffer(msgChanSize), // 消息缓冲区 <缓冲大小>
-		wxClient:  wxclient,
-		addr:      addr,
-		cacheUser: NewCacheInfoManager(),
+		ctx:         ctx,
+		stop:        cancel,
+		msgBuffer:   NewMessageBuffer(msgChanSize), // 消息缓冲区 <缓冲大小>
+		wxClient:    wxclient,
+		self:        NewSelf(wxclient),
+		addr:        addr,
+		cacheMember: NewCacheInfoManager(),
 	}
 }
 
@@ -121,31 +122,371 @@ func (c *Client) Run(debug bool) {
 			logging.Fatal(fmt.Errorf("handle msg err: %w", err).Error(), 1001)
 		}
 	}()
-	go c.cyclicUpdateSelfInfo(false)  // 启动定时更新
-	go c.cyclicUpdateCacheInfo(false) // 启动定时更新
+	go c.cyclicUpdateSelfInfo(true)  // 启动定时更新
+	go c.cyclicUpdateCacheInfo(true) // 启动定时更新
 }
 
 func (c *Client) IsLogin() bool {
 	return c.wxClient.IsLogin()
 }
 
-// GetMsg 获取消息 !!!不推荐使用!!!（请使用管道获取消息）
-// Deprecated
-func (c *Client) GetMsg() (*Message, error) {
-	if !c.wxClient.IsLogin() {
-		logging.Warn("客户端并未登录成功，请稍重试")
-		return nil, ErrNotLogin
-	}
-	msg, err := c.msgBuffer.Get(c.ctx)
-	if err != nil {
-		return nil, err
-	}
-	return msg, nil
-}
-
 // GetMsgChan 返回消息的管道
 func (c *Client) GetMsgChan() <-chan *Message {
 	return c.msgBuffer.msgCH
+}
+
+// SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)> todo test 重构后待测试
+func (c *Client) SendText(receiver string, content string, ats ...string) error {
+	// 根据 wxid 获取对应的 Name
+	names := make([]string, 0, len(ats))
+	atList := make([]string, 0, len(ats))
+	for _, wxid := range ats {
+		if wxid == "notify@all" {
+			names = append(names, "所有人")
+			atList = append(atList, "notify@all")
+			continue
+		}
+		m := c.GetMember(wxid, true)
+		if m.NickName == "" && m.Alias == "" {
+			logging.Debug("sendText NickName && Alias null", map[string]interface{}{"wxid": wxid, "info": m})
+			names = append(names, wxid) // 如果获取失败，使用 wxid 代替
+			atList = append(atList, wxid)
+		} else {
+			if m.Alias != "" {
+				names = append(names, m.Alias)
+			} else if m.NickName != "" {
+				names = append(names, m.NickName)
+			}
+			atList = append(atList, wxid)
+		}
+	}
+
+	hasAt := strings.Contains(content, "@")
+
+	// 如果内容中不包含 @ 符号，则在开头添加 @<Name>
+	if !hasAt {
+		for _, name := range names {
+			content = "@" + name + " " + content
+		}
+	} else {
+		// 替换 @ 符号
+		for _, name := range names {
+			content = strings.Replace(content, "@", "@"+name+" ", 1)
+		}
+	}
+
+	// 发送文本
+	res := c.wxClient.SendTxt(content, receiver, atList)
+	if res != 0 {
+		logging.Debug("wxCliend.SendTxt", map[string]interface{}{"res": res, "receiver": receiver, "content": content, "ats": ats})
+		return fmt.Errorf("wxClient.SendTxt err, code: %d", res)
+	}
+	return nil
+}
+
+// SendImage 发送图片 <wxid or roomid> <图片绝对路径>
+func (c *Client) SendImage(receiver string, src string) error {
+	var tmpFile *os.File    //  声明 tmpFile 变量
+	if imgutil.IsURL(src) { // 网络地址
+		bytes, err := imgutil.ImgFetch(src)
+		if err != nil {
+			logging.ErrorWithErr(err, "imgutil.ImgFetch")
+			return err
+		}
+		// 创建临时文件
+		tmpFile, err = imgutil.CreateTempFile(".jpg")
+		if err != nil {
+			logging.ErrorWithErr(err, "imgutil.CreateTempFile")
+			return err
+		}
+		defer func() { // 使用闭包处理 tmpFile.Close() 的错误
+			if closeErr := tmpFile.Close(); closeErr != nil {
+				logging.ErrorWithErr(closeErr, "tmpFile.Close error in defer")
+			}
+		}()
+
+		// 写入临时文件
+		_, err = tmpFile.Write(bytes)
+		if err != nil {
+			logging.ErrorWithErr(err, "tmpFile.Write")
+			return err
+		}
+		src = tmpFile.Name() // 使用临时文件路径
+	}
+	res := c.wxClient.SendIMG(src, receiver)
+	if imgutil.IsURL(src) && tmpFile != nil { //  只有网络图片才删除临时文件, 并且确保 tmpFile 不为 nil
+		if removeErr := imgutil.RemoveTempFile(tmpFile.Name()); removeErr != nil {
+			logging.ErrorWithErr(removeErr, "imgutil.RemoveTempFile error")
+		}
+	}
+	if res != 0 {
+		logging.Debug("wxCliend.SendIMG", map[string]interface{}{"res": res, "receiver": receiver, "src": src}) // 打印 src 方便debug
+		return fmt.Errorf("wxClient.SendIMG err, code: %d", res)
+	}
+	return nil
+}
+
+// SendFile 发送图片 <wxid or roomid> <文件绝对路径>
+func (c *Client) SendFile(receiver string, src string) error {
+	res := c.wxClient.SendFile(src, receiver)
+	if res != 0 {
+		logging.Debug("wxCliend.SendFile", map[string]interface{}{"res": res, "receiver": receiver})
+		return fmt.Errorf("wxClient.SendFile err, code: %d", res)
+	}
+	return nil
+}
+
+// RoomMembers 获取群成员信息
+func (c *Client) RoomMembers(roomId string) ([]*ContactInfo, error) {
+	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
+	logging.Debug("GetRoomMemberID", map[string]interface{}{"roomId": roomId, "contacts": contacts})
+
+	if len(contacts) == 0 || len(contacts[0].GetFields()) == 0 {
+		return nil, fmt.Errorf("no room data found for roomId: %s", roomId)
+	}
+
+	roomDataBytes := contacts[0].GetFields()[0].Content
+
+	roomData := &roomdata.RoomData{}
+
+	err := proto.Unmarshal(roomDataBytes, roomData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RoomData: %w", err)
+	}
+	var roomMembers = make([]*ContactInfo, len(roomData.GetMembers()))
+	for i, member := range roomData.GetMembers() {
+		roomMembers[i] = c.GetMember(member.Wxid, true)
+		roomMembers[i].Wxid = member.Wxid
+		roomMembers[i].Alias = member.Name
+	}
+
+	return roomMembers, nil
+}
+
+// ChatRoomOwner 获取群主
+func (c *Client) ChatRoomOwner(roomId string) *ContactInfo {
+	res := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT Reserved2 FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
+	if res == nil || len(res) == 0 || len(res[0].GetFields()) == 0 {
+		logging.Debug("获取群组错误", map[string]interface{}{"roomId": roomId, "res": res})
+		return nil
+	}
+	Reserved2 := res[0].GetFields()[0].Content
+	wxid := string(Reserved2)
+	info, ok := c.cacheMember.GetContactInfo(wxid)
+	if ok || info != nil {
+		return info // 返回群主信息
+	}
+	return nil
+}
+
+// GetSelfInfo 获取账号个人信息
+func (c *Client) GetSelfInfo() (info SelfInfo, ok bool) { // fixme: 重构
+	return c.self.GetSelfInfo()
+}
+
+// GetSelfName 获取机器人昵称
+func (c *Client) GetSelfName() (string, bool) {
+	info, ok := c.self.GetSelfInfo()
+	return info.Name, ok
+}
+
+// GetSelfWxId 获取机器人微信ID
+func (c *Client) GetSelfWxId() (string, bool) {
+	info, ok := c.self.GetSelfInfo()
+	return info.Wxid, ok
+}
+
+// GetSelfFileStoragePath 获取机器人文件存储路径
+func (c *Client) GetSelfFileStoragePath() (string, bool) {
+	info, ok := c.self.GetSelfInfo()
+	return info.FileStoragePath, ok
+}
+
+func (c *Client) GetMember(id string, byCache bool) *ContactInfo {
+	if byCache { // 走缓存
+		info, b := c.cacheMember.GetContactInfo(id)
+		if b {
+			return info
+		}
+	}
+	var cInfo = &ContactInfo{}
+	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from Contact where UserName = '%s';", id)) // 注意 原字段 UserName指的就是 wxid
+	if len(contacts) != 0 {
+		c.nomalize(contacts[0], cInfo)
+	}
+	return cInfo
+}
+
+// cyclicUpdateSelfInfo 定时更新机器人信息 <immediate 立即执行一次>
+func (c *Client) cyclicUpdateSelfInfo(immediate bool) {
+	if immediate {
+		c.self.UpdateInfo()
+	}
+	ticker := time.NewTicker(time.Hour * 2)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			c.self.UpdateInfo() // 每30 分钟更新一次
+			c.self.UpdateContact()
+		}
+	}
+}
+
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	v := reflect.ValueOf(i)
+
+	// 先处理接口类型，获取其内部的实际值
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return true
+		}
+		v = v.Elem()
+	}
+
+	switch v.Kind() {
+	case reflect.Ptr | reflect.Interface:
+		return v.IsNil()
+	case reflect.Slice, reflect.Map:
+		return v.Len() == 0
+	default:
+		return false
+	}
+}
+
+// 定时更新用户信息 <immediate 立即执行一次>
+func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
+	if immediate {
+		c.updateCacheInfo(false)
+	}
+	ticker := time.NewTicker(time.Minute * 30)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			c.updateCacheInfo(true)
+		}
+	}
+}
+
+// 更新缓存用户信息 <isAsync GetAllMember是否异步>
+func (c *Client) updateCacheInfo(isAsync bool) {
+	if !c.wxClient.IsLogin() { // fixme: 登入后运行时扔可能获取到登录错误
+		logging.WarnWithErr(ErrNotLogin, "[尚未登陆]跳过更新联系人信息")
+		return
+	}
+	if isAsync {
+		go c.getAllMember()
+	} else {
+		c.getAllMember()
+	}
+}
+
+// getAllMember 获取所有的联系人（包括群聊中的陌生群成员）
+func (c *Client) getAllMember() *[]*ContactInfo {
+	if !c.memberLock.TryLock() {
+		return nil
+	}
+	defer c.memberLock.Unlock()
+	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "select * from Contact;")
+	if len(contacts) == 0 {
+		logging.Error("client.getAllMember: queryDB res is nil")
+		return nil
+	}
+	var memberList = make([]*ContactInfo, 0, len(contacts))
+	for _, contact := range contacts {
+		var cInfo = &ContactInfo{}
+		c.nomalize(contact, cInfo)
+		memberList = append(memberList, cInfo)
+	}
+	//logging.Debug("client.getAllMember()", map[string]interface{}{"memberList": memberList})
+	return &memberList
+}
+
+// 解析 ContactInfo
+func (c *Client) nomalize(contact *wcf.DbRow, cInfo *ContactInfo) {
+	for _, field := range contact.Fields {
+		switch field.Column {
+		case "UserName":
+			cInfo.Wxid = string(field.Content)
+		case "Alias":
+			cInfo.Alias = string(field.Content)
+		case "DelFlag":
+			if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+				cInfo.DelFlag = uint8(num)
+			} else {
+				logging.WarnWithErr(err, "error parsing DelFlag")
+				cInfo.DelFlag = 0 // todo 或者其他默认值
+			}
+		case "Type":
+			if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
+				cInfo.ContactType = uint8(num)
+			} else {
+				cInfo.ContactType = 0
+			}
+		case "Remark":
+			cInfo.Remark = string(field.Content)
+		case "NickName":
+			cInfo.NickName = string(field.Content)
+		case "PYInitial":
+			cInfo.PyInitial = string(field.Content)
+		case "QuanPin":
+			cInfo.QuanPin = string(field.Content)
+		case "RemarkPYInitial":
+			cInfo.RemarkPyInitial = string(field.Content)
+		case "RemarkQuanPin":
+			cInfo.RemarkQuanPin = string(field.Content)
+		case "SmallHeadImgUrl":
+			cInfo.SmallHeadURL = string(field.Content)
+		case "BigHeadImgUrl":
+			cInfo.BigHeadURL = string(field.Content)
+		}
+	}
+	// 查询小头像和大头像
+	if cInfo.Wxid != "" {
+		query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
+		for _, row := range query {
+			for _, field := range row.Fields {
+				switch field.Column {
+				case "smallHeadImgUrl":
+					cInfo.SmallHeadURL = string(field.Content)
+				case "bigHeadImgUrl":
+					cInfo.BigHeadURL = string(field.Content)
+				}
+			}
+		}
+	}
+	c.cacheMember.CacheContactInfo(cInfo) // 更新缓存
+}
+
+// GetFullFilePathFromRelativePath 通过相对路径获取完整文件路径
+func (c *Client) GetFullFilePathFromRelativePath(relativePath string) string {
+	fileStoragePath, ok := c.GetSelfFileStoragePath()
+	if fileStoragePath == "" || !ok {
+		logging.Error("GetFullFilePathFromRelativePath: FileStoragePath is empty")
+		return "" // 或者返回错误
+	}
+	// todo 后续可能支持其他的dat解析
+	// MsgAttach
+	fullFilePath := filepath.Join(fileStoragePath, "MsgAttach", relativePath)
+	return filepath.ToSlash(fullFilePath) // 使用 filepath.ToSlash 转换为正斜杠
+}
+
+// DecodeDatFileToBytes 解码 .dat 文件为图片, 并返回字节数组
+func (c *Client) DecodeDatFileToBytes(datPath string) []byte {
+	bytes, err := imgutil.DecodeDatFileToBytes(datPath)
+	if err != nil {
+		logging.ErrorWithErr(err, "DecodeDatFileToBytes", nil)
+		return nil
+	}
+	return bytes
 }
 
 func (c *Client) handleMsg(ctx context.Context) (err error) {
@@ -178,21 +519,19 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	}
 	var roomMembers []*ContactInfo
 	if msg.IsGroup { // 群聊消息
-		roomMemberIds, err := c.GetRoomMemberID(msg.Roomid)
+		member, err := c.RoomMembers(msg.Roomid)
 		if err != nil {
-			logging.ErrorWithErr(err, "GetRoomMemberID")
-		} else {
-			roomMembers, err = c.GetMember(roomMemberIds...)
-			if err != nil {
-				logging.ErrorWithErr(err, "GetMember")
-			}
+			logging.Debug("get room member err", map[string]interface{}{"err": err.Error()})
 		}
+		roomMembers = member
 	} else { // 不是群组消息
 		msg.Roomid = "" // 置空
 	}
 	rd := &RoomData{Members: roomMembers}
-	rd.AnalyseMemberAt(c.GetSelfWxId(), msg.Content)
-
+	id, b := c.GetSelfWxId()
+	if b {
+		rd.AnalyseMemberAt(id, msg.Content)
+	}
 	m := &Message{
 		IsSelf:    msg.IsSelf,
 		IsGroup:   msg.IsGroup,
@@ -250,6 +589,7 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 		rawMsg: m,
 		sender: sender,
 		cli:    c,
+		self:   c.self,
 	}
 	m.meta = metaData
 	return m
@@ -344,526 +684,4 @@ func getReferMsgContentTitle(referNode *xmlquery.Node) string {
 	}
 
 	return titleNode.InnerText()
-}
-
-// SendText 发送普通文本 <wxid or roomid> <文本内容> <艾特的人(wxid) 所有人:(notify@all)>
-func (c *Client) SendText(receiver string, content string, ats ...string) error {
-	// 根据 wxid 获取对应的 Name
-	names := make([]string, 0, len(ats))
-	atList := make([]string, 0, len(ats))
-	for _, wxid := range ats {
-		if wxid == "notify@all" {
-			names = append(names, "所有人")
-			atList = append(atList, "notify@all")
-			continue
-		}
-		friend, err := c.GetMember(wxid)
-		if len(friend) == 0 || err != nil {
-			logging.WarnWithErr(err, "SendText.GetMember err")
-			names = append(names, wxid) // 如果获取失败，使用 wxid 代替
-			atList = append(atList, wxid)
-		} else {
-			names = append(names, friend[0].NickName)
-			atList = append(atList, wxid)
-		}
-	}
-
-	hasAt := strings.Contains(content, "@")
-
-	// 如果内容中不包含 @ 符号，则在开头添加 @<Name>
-	if !hasAt {
-		for _, name := range names {
-			content = "@" + name + " " + content
-		}
-	} else {
-		// 替换 @ 符号
-		for _, name := range names {
-			content = strings.Replace(content, "@", "@"+name+" ", 1)
-		}
-	}
-
-	// 发送文本
-	res := c.wxClient.SendTxt(content, receiver, atList)
-	if res != 0 {
-		logging.Debug("wxCliend.SendTxt", map[string]interface{}{"res": res, "receiver": receiver, "content": content, "ats": ats})
-		return fmt.Errorf("wxClient.SendTxt err, code: %d", res)
-	}
-	return nil
-}
-
-// SendImage 发送图片 <wxid or roomid> <图片绝对路径>
-func (c *Client) SendImage(receiver string, src string) error {
-	var tmpFile *os.File    //  声明 tmpFile 变量
-	if imgutil.IsURL(src) { // 网络地址
-		bytes, err := imgutil.ImgFetch(src)
-		if err != nil {
-			logging.ErrorWithErr(err, "imgutil.ImgFetch")
-			return err
-		}
-		// 创建临时文件
-		tmpFile, err = imgutil.CreateTempFile(".jpg")
-		if err != nil {
-			logging.ErrorWithErr(err, "imgutil.CreateTempFile")
-			return err
-		}
-		defer func() { // 使用闭包处理 tmpFile.Close() 的错误
-			if closeErr := tmpFile.Close(); closeErr != nil {
-				logging.ErrorWithErr(closeErr, "tmpFile.Close error in defer")
-			}
-		}()
-
-		// 写入临时文件
-		_, err = tmpFile.Write(bytes)
-		if err != nil {
-			logging.ErrorWithErr(err, "tmpFile.Write")
-			return err
-		}
-		src = tmpFile.Name() // 使用临时文件路径
-	}
-	res := c.wxClient.SendIMG(src, receiver)
-	if imgutil.IsURL(src) && tmpFile != nil { //  只有网络图片才删除临时文件, 并且确保 tmpFile 不为 nil
-		if removeErr := imgutil.RemoveTempFile(tmpFile.Name()); removeErr != nil {
-			logging.ErrorWithErr(removeErr, "imgutil.RemoveTempFile error")
-		}
-	}
-	if res != 0 {
-		logging.Debug("wxCliend.SendIMG", map[string]interface{}{"res": res, "receiver": receiver, "src": src}) // 打印 src 方便debug
-		return fmt.Errorf("wxClient.SendIMG err, code: %d", res)
-	}
-	return nil
-}
-
-// SendFile 发送图片 <wxid or roomid> <文件绝对路径>
-func (c *Client) SendFile(receiver string, src string) error {
-	res := c.wxClient.SendFile(src, receiver)
-	if res != 0 {
-		logging.Debug("wxCliend.SendFile", map[string]interface{}{"res": res, "receiver": receiver})
-		return fmt.Errorf("wxClient.SendFile err, code: %d", res)
-	}
-	return nil
-}
-
-// GetRoomMemberID 获取群成员信息，返回解码后的字符串以及 wxid 列表
-func (c *Client) GetRoomMemberID(roomId string) ([]string, error) {
-	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
-	logging.Debug("GetRoomMemberID", map[string]interface{}{"roomId": roomId, "contacts": contacts})
-
-	if len(contacts) == 0 || len(contacts[0].GetFields()) == 0 {
-		return nil, fmt.Errorf("no room data found for roomId: %s", roomId)
-	}
-
-	roomDataBytes := contacts[0].GetFields()[0].Content
-
-	roomData := &roomdata.RoomData{}
-
-	err := proto.Unmarshal(roomDataBytes, roomData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal RoomData: %w", err)
-	}
-
-	var wxids []string
-	for _, member := range roomData.GetMembers() {
-		wxids = append(wxids, member.GetWxid())
-	}
-
-	return wxids, nil
-}
-
-// GetSelfInfo 获取账号个人信息
-func (c *Client) GetSelfInfo() *Self {
-	u := c.wxClient.GetUserInfo()
-	if u == nil {
-		logging.ErrorWithErr(ErrNull, "get self info err")
-		return c.self
-	}
-	self := &Self{}
-	self.Wxid = u.Wxid
-	self.Name = u.Name
-	self.Mobile = u.Mobile
-	self.Home = u.Home
-	self.FileStoragePath = filepath.Join(u.Home, u.Wxid, "FileStorage")
-	c.self = self // 更新缓存
-	return self
-}
-
-// GetSelfName 获取机器人昵称
-func (c *Client) GetSelfName() string {
-	if c.self == nil || c.self.Name == "" {
-		c.GetSelfInfo() // 更新缓存
-	}
-	if c.self == nil {
-		return ""
-	}
-	return c.self.Name
-}
-
-// GetSelfWxId 获取机器人微信ID
-func (c *Client) GetSelfWxId() string {
-	if c.self == nil || c.self.Wxid == "" {
-		c.GetSelfInfo() // 更新缓存
-	}
-	if c.self == nil || c.self.Wxid == "" {
-		return ""
-	}
-	return c.self.Wxid
-}
-
-// GetSelfFileStoragePath 获取机器人文件存储路径
-func (c *Client) GetSelfFileStoragePath() string {
-	if c.self == nil || c.self.FileStoragePath == "" {
-		c.GetSelfInfo() // 更新缓存
-	}
-	if c.self == nil {
-		return ""
-	}
-	return c.self.FileStoragePath
-}
-
-// cyclicUpdateSelfInfo 定时更新机器人信息 <immediate 立即执行一次>
-func (c *Client) cyclicUpdateSelfInfo(immediate bool) {
-	if immediate {
-		c.GetSelfInfo()
-	}
-	ticker := time.NewTicker(time.Minute * 2)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case <-ticker.C:
-			c.GetSelfInfo() // 每2分钟更新一次
-		}
-	}
-}
-
-func isNil(i interface{}) bool {
-	if i == nil {
-		return true
-	}
-	v := reflect.ValueOf(i)
-
-	// 先处理接口类型，获取其内部的实际值
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return true
-		}
-		v = v.Elem()
-	}
-
-	switch v.Kind() {
-	case reflect.Ptr | reflect.Interface:
-		return v.IsNil()
-	case reflect.Slice, reflect.Map:
-		return v.Len() == 0
-	default:
-		return false
-	}
-}
-
-func (c *Client) getInfo(wxid string, isAll bool, t InfoType, retry int, f func(id string, isAll bool, t InfoType) (interface{}, error)) (interface{}, error) {
-	result, err := f(wxid, isAll, t) // 缓存中尝试获取
-
-	if retry > 0 && isNil(result) { // 未命中缓存情况
-		if t == memberType {
-			if c.cacheUser.memberCount != 0 {
-				c.updateCacheInfo(true, retry <= 0, true)
-				return result, err
-			}
-			c.updateCacheInfo(true, retry <= 0, false)
-		} else {
-			c.updateCacheInfo(false, retry <= 0, false)
-		}
-		return c.getInfo(wxid, isAll, t, retry-1, f)
-	}
-	return result, err
-}
-
-// GetFriend 根据wxid获取好友信息
-func (c *Client) GetFriend(wxid string) (*Friend, error) {
-	info, err := c.getInfo(wxid, false, friendType, 3, c.cacheUser.Get)
-	if err != nil {
-		return nil, err
-	}
-	res, _ := info.(*Friend)
-	return res, nil
-}
-
-// GetAllFriend 获取所有好友信息
-func (c *Client) GetAllFriend() (*FriendList, error) {
-	info, err := c.getInfo("", true, friendType, 3, c.cacheUser.Get)
-	if err != nil {
-		logging.ErrorWithErr(err, "get all friend err")
-		return nil, err
-	}
-	res, _ := info.(*FriendList)
-	return res, nil
-}
-
-// GetChatRoom 根据roomId获取群组信息 todo 完善ChatRoom字段
-func (c *Client) GetChatRoom(roomId string) (*ChatRoom, error) {
-	info, err := c.getInfo(roomId, false, roomType, 3, c.cacheUser.Get)
-	if err != nil {
-		logging.ErrorWithErr(err, "get all friend err")
-		return nil, err
-	}
-	res, _ := info.(*ChatRoom)
-	return res, nil
-}
-
-// GetAllChatRoom 获取所有群组信息
-func (c *Client) GetAllChatRoom() (*ChatRoomList, error) {
-	info, err := c.getInfo("", true, roomType, 3, c.cacheUser.Get)
-	if err != nil {
-		logging.ErrorWithErr(err, "get all friend err")
-		return nil, err
-	}
-	res, _ := info.(*ChatRoomList)
-	return res, nil
-}
-
-// GetMember 根据wxid获取成员（包括群组陌生人）
-func (c *Client) GetMember(wxidList ...string) ([]*ContactInfo, error) {
-	var result = make([]*ContactInfo, 0, len(wxidList))
-	for _, wxid := range wxidList {
-		info, err := c.getInfo(wxid, false, memberType, 1, c.cacheUser.Get)
-		if err != nil {
-			logging.Debug("GetMember by wxid err", map[string]interface{}{"err": err.Error()})
-			result = append(result, nil)
-			continue
-		}
-		result = append(result, info.(*ContactInfo))
-	}
-	if len(result) == 0 {
-		return nil, ErrNull
-	}
-	return result, nil
-}
-
-// GetAllMember 获取全部成员（包括群组陌生人）
-func (c *Client) GetAllMember() ([]*ContactInfo, error) {
-	info, err := c.getInfo("", true, memberType, 3, c.cacheUser.Get)
-	if err != nil {
-		logging.ErrorWithErr(err, "get all member err")
-		return nil, err
-	}
-	res, _ := info.([]*ContactInfo)
-	return res, nil
-}
-
-// 定时更新用户信息 <immediate 立即执行一次>
-func (c *Client) cyclicUpdateCacheInfo(immediate bool) {
-	if immediate {
-		c.updateCacheInfo(true, true, true)
-	}
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case <-ticker.C:
-			c.updateCacheInfo(true, true, true) // 每分钟更新一次
-		}
-	}
-}
-
-// 更新缓存用户信息 <isAsync GetAllMember是否异步> <是否输出错误日志>
-func (c *Client) updateCacheInfo(IsGetMember bool, isLogErr bool, async bool) {
-	if !c.wxClient.IsLogin() {
-		logging.WarnWithErr(ErrNotLogin, "[尚未登陆]跳过更新联系人信息")
-		return
-	}
-	group := sync.WaitGroup{}
-	if !async {
-		group.Add(1)
-	}
-	go func() {
-		if !async {
-			defer group.Done()
-		}
-		contacts := c.wxClient.GetContacts()
-		if len(contacts) == 0 {
-			logging.Debug("get contacts err", map[string]interface{}{"err": ErrNull.Error()})
-			return
-		}
-		if IsGetMember {
-			allMember := c.getAllMember()
-			if allMember != nil {
-				c.cacheUser.UpdateMembers(allMember) // 查询数据库获取全部联系人并更新
-			}
-		}
-		for _, contact := range contacts {
-			user := c.getUser(contact)
-			if user == nil {
-				continue
-			}
-			switch v := user.(type) {
-			case Friend:
-				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "friend": v})
-				c.cacheUser.updateFriend(&v)
-			case ChatRoom: // todo 完善chatRoom字段
-				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "chatroom": v})
-				v.RoomID = v.Wxid
-				roomMemberIds, err := c.GetRoomMemberID(v.RoomID)
-				if err != nil {
-					if isLogErr {
-						logging.WarnWithErr(err, "get room member id err")
-					}
-				} else {
-					members, err := c.cacheUser.GetMemberByList(roomMemberIds...) // todo 疑似成员不全，一些成员获取失败（换方式获取）
-					if err != nil {
-						if isLogErr {
-							logging.WarnWithErr(err, "get room member err")
-						}
-					} else {
-						v.RoomData = &RoomData{Members: members}
-					}
-				}
-				room, err := c.cacheUser.GetMember(v.RoomID)
-				if err != nil {
-					if isLogErr {
-						logging.WarnWithErr(err, "get room err")
-					}
-
-				} else {
-					v.RoomHeadImgURL = &room.SmallHeadURL
-					//todo 公告字段 v.RoomAnnouncement
-				}
-				c.cacheUser.updateChatRoom(&v)
-			case GH:
-				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user, "gh": v})
-			// todo cache GH
-			case User: // User 类型为除了上方类型的特殊类型，如文件助手、漂流瓶等
-				logging.Debug("updateCacheInfo", map[string]interface{}{"user": user})
-			default: // 未知类型
-				logging.Warn("unknown user type", map[string]interface{}{"user": user})
-			}
-		}
-	}()
-	if !async {
-		group.Wait()
-	}
-}
-
-// getWxIdType 判断 wxid 类型
-func (c *Client) getUser(ct *wcf.RpcContact) interface{} {
-	user := User{
-		Wxid:     ct.Wxid,
-		Code:     ct.Code,
-		Remark:   ct.Remark,
-		Name:     ct.Name,
-		Country:  ct.Country,
-		Province: ct.Province,
-		City:     ct.City,
-		Gender:   GenderType(ct.Gender),
-	}
-	switch true {
-	case strings.HasPrefix(ct.Wxid, "wxid_"):
-		return Friend(user)
-	case strings.HasSuffix(ct.Wxid, "@chatroom"):
-		return ChatRoom{User: user}
-	case strings.HasPrefix(ct.Wxid, "gh_"):
-		return GH(user)
-	default:
-		specialUserType := GetSpecialUserType(ct.Wxid)
-		if specialUserType != SpecialUserTypeUnknown {
-			return user
-		}
-		logging.Warn("unknown contact type", map[string]interface{}{"type": ct.Wxid})
-		return nil
-	}
-}
-
-// getAllMember 获取所有的联系人（包括群聊中的陌生群成员）
-func (c *Client) getAllMember() *[]*ContactInfo {
-	if !c.memberLock.TryLock() {
-		return nil
-	}
-	defer c.memberLock.Unlock()
-	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "select * from Contact;")
-	if len(contacts) == 0 {
-		logging.Error("client.getAllMember: contact not found")
-		return nil
-	}
-	var memberList = make([]*ContactInfo, 0, len(contacts))
-	for _, contact := range contacts {
-		var cInfo = &ContactInfo{}
-		for _, field := range contact.Fields {
-			switch field.Column {
-			case "UserName":
-				cInfo.Wxid = string(field.Content)
-			case "Alias":
-				cInfo.Alias = string(field.Content)
-			case "DelFlag":
-				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
-					cInfo.DelFlag = uint8(num)
-				} else {
-					logging.WarnWithErr(err, "error parsing DelFlag")
-					cInfo.DelFlag = 0 // todo 或者其他默认值
-				}
-			case "Type":
-				if num, err := strconv.ParseUint(string(field.Content), 10, 8); err == nil {
-					cInfo.ContactType = uint8(num)
-				} else {
-					cInfo.ContactType = 0
-				}
-			case "Remark":
-				cInfo.Remark = string(field.Content)
-			case "NickName":
-				cInfo.NickName = string(field.Content)
-			case "PYInitial":
-				cInfo.PyInitial = string(field.Content)
-			case "QuanPin":
-				cInfo.QuanPin = string(field.Content)
-			case "RemarkPYInitial":
-				cInfo.RemarkPyInitial = string(field.Content)
-			case "RemarkQuanPin":
-				cInfo.RemarkQuanPin = string(field.Content)
-			case "SmallHeadImgUrl":
-				cInfo.SmallHeadURL = string(field.Content)
-			case "BigHeadImgUrl":
-				cInfo.BigHeadURL = string(field.Content)
-			}
-		}
-		// 查询小头像和大头像
-		if cInfo.Wxid != "" {
-			query := c.wxClient.ExecDBQuery("MicroMsg.db", fmt.Sprintf("select * from ContactHeadImgUrl where usrName = '%s';", cInfo.Wxid))
-			for _, row := range query {
-				for _, field := range row.Fields {
-					switch field.Column {
-					case "smallHeadImgUrl":
-						cInfo.SmallHeadURL = string(field.Content)
-					case "bigHeadImgUrl":
-						cInfo.BigHeadURL = string(field.Content)
-					}
-				}
-			}
-		}
-		memberList = append(memberList, cInfo)
-	}
-	logging.Debug("client.getAllMember()", map[string]interface{}{"memberList": memberList})
-	return &memberList
-}
-
-// GetFullFilePathFromRelativePath 通过相对路径获取完整文件路径
-func (c *Client) GetFullFilePathFromRelativePath(relativePath string) string {
-	fileStoragePath := c.GetSelfFileStoragePath()
-	if fileStoragePath == "" {
-		logging.Error("GetFullFilePathFromRelativePath: FileStoragePath is empty")
-		return "" // 或者返回错误
-	}
-	// todo 后续可能支持其他的dat解析
-	// MsgAttach
-	fullFilePath := filepath.Join(fileStoragePath, "MsgAttach", relativePath)
-	return filepath.ToSlash(fullFilePath) // 使用 filepath.ToSlash 转换为正斜杠
-}
-
-// DecodeDatFileToBytes 解码 .dat 文件为图片, 并返回字节数组
-func (c *Client) DecodeDatFileToBytes(datPath string) []byte {
-	bytes, err := imgutil.DecodeDatFileToBytes(datPath)
-	if err != nil {
-		logging.ErrorWithErr(err, "DecodeDatFileToBytes", nil)
-		return nil
-	}
-	return bytes
 }
