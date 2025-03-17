@@ -41,6 +41,6 @@ func (cm *ContactInfoManager) GetContactInfo(id string) (*ContactInfo, bool) {
 
 // Close 清理缓存
 func (cm *ContactInfoManager) Close() {
-	cm.contactInfoCache = nil // 释放引用
+	// todo
 	logging.Warn("【wcf】close user cache")
 }
