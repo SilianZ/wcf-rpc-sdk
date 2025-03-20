@@ -450,15 +450,15 @@ func TestClient_SendEmotion(t *testing.T) {
 	}
 	defer c.Close()
 
-	wxid := c.GetSelfWXID()
-	if wxid == "" {
-		t.Skip("SelfWXID is empty, skipping SendEmotion test")
-	}
+	//wxid := c.GetSelfWXID()
+	//if wxid == "" {
+	//	t.Skip("SelfWXID is empty, skipping SendEmotion test")
+	//}
 
 	// 请替换为实际的表情图片路径
-	emotionPath := "path/to/your/emotion.gif" // 请替换为你的表情图片路径
+	emotionPath := "C:\\image\\test01.png" // 请替换为你的表情图片路径
 
-	status := c.SendEmotion(emotionPath, wxid)
+	status := c.SendEmotion(emotionPath, "wxid_jj4mhsji9tjk22")
 	if status != 0 {
 		t.Errorf("SendEmotion() = %v, want 0", status)
 	}
@@ -472,8 +472,8 @@ func TestClient_SendPat(t *testing.T) {
 	defer c.Close()
 
 	// 假设你有一个测试群和群成员，请替换为你的测试群 ID 和成员 wxid
-	roomID := "your_test_room_id" // 请替换为你的测试群 ID
-	wxid := "member_wxid_in_room" // 请替换为你要拍的群成员 wxid
+	roomID := "45959390469@chatroom" // 请替换为你的测试群 ID
+	wxid := "wxid_jj4mhsji9tjk22"    // 请替换为你要拍的群成员 wxid
 
 	status := c.SendPat(roomID, wxid)
 	if status != 1 {
@@ -507,8 +507,8 @@ func TestClient_ForwardMsg(t *testing.T) {
 	defer c.Close()
 
 	// 这些值需要根据实际的消息来填写
-	msgID := uint64(12345)      // 请替换为实际的消息 ID
-	receiver := "receiver_wxid" // 请替换为实际的消息接收者 wxid
+	msgID := uint64(574943826264397157) // 请替换为实际的消息 ID
+	receiver := "45959390469@chatroom"  // 请替换为实际的消息接收者 wxid
 
 	status := c.ForwardMsg(msgID, receiver)
 	if status != 1 {

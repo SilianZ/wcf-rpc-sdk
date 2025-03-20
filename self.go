@@ -52,6 +52,9 @@ func (s *Self) GetSelfInfo() (info SelfInfo, ok bool) {
 func (s *Self) getSelfInfo(getLatest bool) SelfInfo {
 	if getLatest {
 		info := s.cli.GetUserInfo()
+		if info == nil || info.Wxid == "" {
+			return SelfInfo{}
+		}
 		s.Wxid = info.Wxid
 		s.Name = info.Name
 		s.Home = info.Home

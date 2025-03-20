@@ -226,7 +226,7 @@ func (c *Client) SendImage(receiver string, src string) error {
 	return nil
 }
 
-// SendFile 发送图片 <wxid or roomid> <文件绝对路径>
+// SendFile 发送图片 <wxid or roomid> <文件绝对路径> todo 支持网络地址发送文件
 func (c *Client) SendFile(receiver string, src string) error {
 	res := c.wxClient.SendFile(src, receiver)
 	if res != 0 {
@@ -566,6 +566,14 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 				m.Quote = &referMsg.Quote
 				m.Content = content
 			}
+		} else if strings.Contains(msg.Content, "<recorditem>") { // 新增的转发消息解析逻辑
+			forwardMsg, err := parseForwardMsg(msg.Content)
+			if err != nil {
+				logging.Debug("parseForwardMsg", map[string]interface{}{"err": err, "xml": msg.Xml})
+			} else {
+				m.Type = MsgTypeXMLForward // 假设您已经定义了这个新的消息类型
+				m.Forward = forwardMsg
+			}
 		} else {
 			// 检查是否是文件类型
 			fileMsg := &FileMsg{}
@@ -684,4 +692,75 @@ func getReferMsgContentTitle(referNode *xmlquery.Node) string {
 	}
 
 	return titleNode.InnerText()
+}
+
+func parseForwardMsg(xmlStr string) (*ForwardMsg, error) {
+	// 循环反转义
+	for strings.Contains(xmlStr, "&amp;") {
+		xmlStr = html.UnescapeString(xmlStr)
+	}
+
+	doc, err := xmlquery.Parse(strings.NewReader(xmlStr))
+	if err != nil {
+		return nil, fmt.Errorf("xmlquery.Parse error: %w", err)
+	}
+
+	// 新增: 获取 fromusername
+	fromUsernameNode := xmlquery.FindOne(doc, "//fromusername")
+	fromUsername := ""
+	if fromUsernameNode != nil {
+		fromUsername = fromUsernameNode.InnerText()
+	}
+
+	// 查找 recorditem 节点
+	recordItemNode := xmlquery.FindOne(doc, "//recorditem")
+	if recordItemNode == nil {
+		return nil, fmt.Errorf("recorditem node not found")
+	}
+
+	// 获取 recorditem 节点的 InnerText 并进行 HTML 反转义
+	recordInfoStr := html.UnescapeString(recordItemNode.InnerText())
+
+	// 使用反转义后的字符串创建一个新的 XML 文档
+	recordInfoDoc, err := xmlquery.Parse(strings.NewReader(recordInfoStr))
+	if err != nil {
+		return nil, fmt.Errorf("xmlquery.Parse recordinfo error: %w", err)
+	}
+
+	// 查找 recordinfo 节点
+	recordInfoNode := xmlquery.FindOne(recordInfoDoc, "//recordinfo")
+	if recordInfoNode == nil {
+		return nil, fmt.Errorf("recordinfo node not found")
+	}
+
+	forwardMsg := &ForwardMsg{
+		Title:        getString(recordInfoNode, "title"),
+		Desc:         getString(recordInfoNode, "desc"),
+		DataList:     []ForwardMsgDataItem{},
+		FromUsername: fromUsername, // 设置 FromUsername
+	}
+
+	// 查找 datalist 下的所有 dataitem
+	dataItemNodes := xmlquery.Find(recordInfoNode, "datalist/dataitem")
+	for _, dataItemNode := range dataItemNodes {
+		dataItem := ForwardMsgDataItem{
+			DataId:        getString(dataItemNode, "@dataid"),
+			DataType:      getInt(dataItemNode, "@datatype"),
+			DataDesc:      getString(dataItemNode, "datadesc"),
+			SourceName:    getString(dataItemNode, "sourcename"),
+			SourceTime:    getString(dataItemNode, "sourcetime"),
+			SourceHeadURL: getString(dataItemNode, "sourceheadurl"),
+			FromNewMsgId:  getInt64(dataItemNode, "fromnewmsgid"),
+			CdnDataUrl:    getString(dataItemNode, "cdndataurl"),
+			CdnThumbUrl:   getString(dataItemNode, "cdnthumburl"),
+			DataFmt:       getString(dataItemNode, "datafmt"),
+			FullMd5:       getString(dataItemNode, "fullmd5"),
+			ThumbFullMd5:  getString(dataItemNode, "thumbfullmd5"),
+			CdnThumbKey:   getString(dataItemNode, "cdnthumbkey"),
+			CdnDataKey:    getString(dataItemNode, "cdndatakey"),
+		}
+		forwardMsg.DataList = append(forwardMsg.DataList, dataItem)
+	}
+
+	return forwardMsg, nil
 }

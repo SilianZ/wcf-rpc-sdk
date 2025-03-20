@@ -464,7 +464,8 @@ func (c *Client) SendXml(path, content, receiver string, Type int32) int32 {
 	return recv.GetStatus()
 }
 
-// SendEmotion 发送emoji
+// SendEmotion 发送emoji  发送既崩溃
+// Deprecated
 func (c *Client) SendEmotion(path, receiver string) int32 {
 	req := genFunReq(Functions_FUNC_SEND_EMOTION)
 	req.Msg = &Request_File{

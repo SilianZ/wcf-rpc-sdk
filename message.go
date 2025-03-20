@@ -58,23 +58,24 @@ func (m *meta) IsSendByFriend() bool {
 }
 
 type Message struct {
-	meta      IMeta     // 用于实现对客户端操作
-	IsSelf    bool      `json:"is_self,omitempty"`
-	IsGroup   bool      `json:"is_group,omitempty"`
-	IsGH      bool      `json:"is_gh,omitempty"` // 是否公众号
-	MessageId uint64    `json:"message_id,omitempty"`
-	Type      MsgType   `json:"type,omitempty"`
-	Ts        uint32    `json:"ts,omitempty"`
-	RoomId    string    `json:"room_id,omitempty"`
-	RoomData  *RoomData `json:"room_data,omitempty"`
-	Content   string    `json:"content,omitempty"`
-	WxId      string    `json:"wx_id,omitempty"`
-	Sign      string    `json:"sign,omitempty"`
-	Thumb     string    `json:"thumb,omitempty"`
-	Extra     string    `json:"extra,omitempty"`
-	Xml       string    `json:"xml,omitempty"`
-	FileInfo  *FileInfo `json:"file_info,omitempty"` // 图片保存信息
-	Quote     *QuoteMsg `json:"quote,omitempty"`     // 引用消息
+	meta      IMeta       // 用于实现对客户端操作
+	IsSelf    bool        `json:"is_self,omitempty"`
+	IsGroup   bool        `json:"is_group,omitempty"`
+	IsGH      bool        `json:"is_gh,omitempty"` // 是否公众号
+	MessageId uint64      `json:"message_id,omitempty"`
+	Type      MsgType     `json:"type,omitempty"`
+	Ts        uint32      `json:"ts,omitempty"`
+	RoomId    string      `json:"room_id,omitempty"`
+	RoomData  *RoomData   `json:"room_data,omitempty"`
+	Content   string      `json:"content,omitempty"`
+	WxId      string      `json:"wx_id,omitempty"`
+	Sign      string      `json:"sign,omitempty"`
+	Thumb     string      `json:"thumb,omitempty"`
+	Extra     string      `json:"extra,omitempty"`
+	Xml       string      `json:"xml,omitempty"`
+	FileInfo  *FileInfo   `json:"file_info,omitempty"` // 图片保存信息
+	Quote     *QuoteMsg   `json:"quote,omitempty"`     // 引用消息
+	Forward   *ForwardMsg `json:"forward,omitempty"`   // 转发消息
 
 	//UserInfo *UserInfo `json:"user_info,omitempty"` todo
 	//Contacts *Contacts `json:"contact,omitempty"`
@@ -383,6 +384,7 @@ const (
 	MsgTypeVideoChannelLive2 MsgType = 975175729  // 视频号直播 // 重复定义
 	MsgTypeMusicLink         MsgType = 1040187441 // 音乐链接
 	MsgTypeFile              MsgType = 1090519089 // 文件
+	MsgTypeXMLForward        MsgType = 4919       // 新增的转发消息类型, 这里我假设是4919，您可以根据实际情况修改
 )
 
 var MsgTypeNames = map[MsgType]string{
@@ -423,6 +425,7 @@ var MsgTypeNames = map[MsgType]string{
 	MsgTypeVideoChannelLive2: "视频号直播", // 与上面的 MsgTypeVideoChannelLive 重复
 	MsgTypeMusicLink:         "音乐链接",
 	MsgTypeFile:              "文件",
+	MsgTypeXMLForward:        "转发消息", // 新增
 }
 
 // QuoteMsg 引用消息
@@ -481,4 +484,28 @@ func GetSpecialUserType(name string) SpecialUserType {
 		return value
 	}
 	return SpecialUserTypeUnknown
+}
+
+type ForwardMsg struct {
+	Title        string               `json:"title,omitempty"`
+	Desc         string               `json:"desc,omitempty"`
+	DataList     []ForwardMsgDataItem `json:"dataList,omitempty"`
+	FromUsername string               `json:"fromUsername,omitempty"`
+}
+
+type ForwardMsgDataItem struct {
+	DataId        string `json:"dataId,omitempty"`
+	DataType      int    `json:"dataType,omitempty"`
+	DataDesc      string `json:"dataDesc,omitempty"`
+	SourceName    string `json:"sourceName,omitempty"`
+	SourceTime    string `json:"sourceTime,omitempty"`
+	SourceHeadURL string `json:"sourceHeadUrl,omitempty"`
+	FromNewMsgId  int64  `json:"fromNewMsgId,omitempty"`
+	CdnDataUrl    string `json:"cdnDataUrl,omitempty"`
+	CdnThumbUrl   string `json:"cdnThumbUrl,omitempty"`
+	DataFmt       string `json:"dataFmt,omitempty"`
+	FullMd5       string `json:"fullMd5,omitempty"`
+	ThumbFullMd5  string `json:"thumbFullMd5,omitempty"`
+	CdnThumbKey   string `json:"cdnThumbKey,omitempty"`
+	CdnDataKey    string `json:"cdnDataKey,omitempty"`
 }
