@@ -236,6 +236,26 @@ func (c *Client) SendFile(receiver string, src string) error {
 	return nil
 }
 
+// CardMessage 卡片消息结构体
+type CardMessage struct {
+	Name     string // 卡片名称
+	Account  string // 账号
+	Title    string // 标题
+	Digest   string // 摘要
+	URL      string // 链接
+	ThumbURL string // 缩略图链接
+}
+
+// SendCardMessage 发送卡片消息
+func (c *Client) SendCardMessage(receiver string, card CardMessage) error {
+	res := c.wxClient.SendRichText(card.Name, card.Account, card.Title, card.Digest, card.URL, card.ThumbURL, receiver)
+	if res != 1 {
+		logging.Debug("wxClient.SendRichText", map[string]interface{}{"res": res, "receiver": receiver, "card": card})
+		return fmt.Errorf("wxClient.SendRichText err, code: %d", res)
+	}
+	return nil
+}
+
 // RoomMembers 获取群成员信息
 func (c *Client) RoomMembers(roomId string) ([]*ContactInfo, error) {
 	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")

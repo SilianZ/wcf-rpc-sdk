@@ -508,3 +508,32 @@ func TestClient_updateCacheInfo(t *testing.T) {
 
 	client.updateCacheInfo(false)
 }
+
+func TestClient_SendCardMessage(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	//client.Run(false)
+	defer client.Close()
+
+	// 等待客户端启动完成
+	time.Sleep(1 * time.Second)
+
+	// 接收者 wxid, 默认为文件助手，可修改为其他好友或群
+	testReceiver := "45959390469@chatroom"
+
+	card := CardMessage{Name: "卡片测试消息", Title: "卡片测试标题", Digest: "卡片摘要", ThumbURL: "https://www.freeimg.cn/i/2024/04/22/66260f2eed1d6.jpg", URL: "https://www.bilibili.com/video/BV1oqQzYrEYn"}
+
+	err := client.SendCardMessage(testReceiver, card)
+	if err != nil {
+		t.Fatalf("卡片消息发送失败: %v", err)
+	}
+	t.Logf("卡片消息发送成功, 请在微信中查看")
+
+	// **手动测试步骤**
+	t.Log("\n**请手动测试:**")
+	t.Log("1. 检查微信是否收到 **本地图片** 和 **网络图片**")
+	t.Log("2. 确认图片内容正确")
+	t.Log("3. 如都收到且显示正常，则手动测试通过")
+}
