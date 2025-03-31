@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // 创建一个全局的 http.Client，并配置为跳过 TLS 验证
@@ -197,13 +198,13 @@ func DecodeDatFile(datFilePath, outputDir string) error {
 		}
 	}
 
-	info, err := os.Stat(datFilePath)
-	if err != nil {
-		return fmt.Errorf("DecodeDatFile: stat dat file: %w", err)
+	// 使用新的检查函数，设置重试次数为 5
+	if err := checkDatFileExists(datFilePath, 5); err != nil {
+		return fmt.Errorf("DecodeDatFile: %w", err)
 	}
-	if info.IsDir() || filepath.Ext(info.Name()) != ".dat" {
-		return errors.New("DecodeDatFile: invalid dat file path") // 返回明确的错误
-	}
+
+	// 获取文件名用于输出路径，因为 checkDatFileExists 已经确认文件存在
+	fileName := filepath.Base(datFilePath)
 
 	preTenBts := make([]byte, 10) //  提前声明 preTenBts
 	sourceFile, err := os.Open(datFilePath)
@@ -223,7 +224,8 @@ func DecodeDatFile(datFilePath, outputDir string) error {
 		return errors.New("DecodeDatFile: file extension not found")
 	}
 
-	outputFilePath := filepath.Join(outputDir, info.Name()+ext)
+	// 使用从 datFilePath 获取的文件名构建输出路径
+	outputFilePath := filepath.Join(outputDir, strings.TrimSuffix(fileName, filepath.Ext(fileName))+ext)
 	distFile, err := os.Create(outputFilePath)
 	if err != nil {
 		return fmt.Errorf("DecodeDatFile: create output file: %w", err)
@@ -231,6 +233,9 @@ func DecodeDatFile(datFilePath, outputDir string) error {
 	defer distFile.Close()
 
 	if err := decodeDatFileInternal(datFilePath, distFile); err != nil { // 调用内部函数
+		// 如果解码失败，尝试删除已创建的空输出文件
+		_ = distFile.Close()          // 确保文件已关闭
+		_ = os.Remove(outputFilePath) // 尝试删除，忽略错误
 		return fmt.Errorf("DecodeDatFile: decodeDatFileInternal: %w", err)
 	}
 
@@ -241,12 +246,10 @@ func DecodeDatFile(datFilePath, outputDir string) error {
 // DecodeDatFileToBytes 解码微信 .dat 文件为图片, 并返回字节数组
 // datFilePath: .dat 文件路径
 func DecodeDatFileToBytes(datFilePath string) ([]byte, error) {
-	info, err := os.Stat(datFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("DecodeDatFileToBytes: stat dat file: %w", err)
-	}
-	if info.IsDir() || filepath.Ext(info.Name()) != ".dat" {
-		return nil, errors.New("DecodeDatFileToBytes: invalid dat file path") // 返回明确的错误
+	// 使用新的检查函数，设置重试次数为 5
+	if err := checkDatFileExists(datFilePath, 5); err != nil {
+		//logging.ErrorWithErr(err, "DecodeDatFile .dat was not exist") // 可以保留日志记录
+		return nil, fmt.Errorf("DecodeDatFileToBytes: %w", err)
 	}
 
 	preTenBts := make([]byte, 10) // 提前声明 preTenBts
@@ -323,4 +326,29 @@ func RemoveTempFile(filePath string) error {
 		return fmt.Errorf("RemoveTempFile: os.Remove: %w", err)
 	}
 	return nil
+}
+
+// checkDatFileExists 检查 .dat 文件是否存在，并包含重试逻辑
+func checkDatFileExists(datFilePath string, retries int) error {
+	var err error
+	for i := 0; i < retries; i++ {
+		info, err := os.Stat(datFilePath)
+		if err == nil {
+			// 检查是否是目录或扩展名不是 .dat
+			if info.IsDir() || filepath.Ext(info.Name()) != ".dat" {
+				return fmt.Errorf("invalid dat file path: %s", datFilePath) // 返回更具体的错误信息
+			}
+			return nil // 文件有效，返回 nil
+		}
+		if !os.IsNotExist(err) {
+			// 如果错误不是 "文件不存在"，则直接返回错误
+			return fmt.Errorf("stat dat file: %w", err)
+		}
+		// 文件不存在，等待后重试
+		if i < retries-1 { // 避免最后一次重试后还等待
+			time.Sleep(2 * time.Second)
+		}
+	}
+	// 重试次数用尽后仍然失败
+	return fmt.Errorf(".dat file was not exist after %d retries: %w", retries, err)
 }
