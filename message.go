@@ -234,7 +234,7 @@ func (rd *RoomData) AnalyseMemberAt(selfWxid string, content string) {
 		return
 	}
 	// 获取消息中艾特成员的成员名
-	re := regexp.MustCompile(`@([^\s]+?) `)
+	re := regexp.MustCompile(`@([\s\S]+?) `)
 	matches := re.FindAllStringSubmatch(content, -1)
 	atNameList := make([]string, len(matches))
 	rd.AtedMSequence = make([]*ContactInfo, len(matches))
