@@ -167,8 +167,7 @@ func (c *Client) ExecDBQuery(db, sql string) []*DbRow {
 }
 
 // AcceptFriend 接收好友请求
-// Deprecated
-func (c *Client) AcceptFriend(v3, v4 string, scene int32) int32 {
+func (c *Client) AcceptFriend(v3, v4 string, scene int64) int32 {
 	req := genFunReq(Functions_FUNC_ACCEPT_FRIEND)
 	q := Request_V{
 		V: &Verification{

@@ -299,6 +299,27 @@ func TestClient_IsSendByFriend(t *testing.T) {
 	}
 }
 
+func TestClient_AcceptNewFriend(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	client.Run(false)
+	defer client.Close()
+
+	msg, b := <-client.GetMsgChan()
+	if !b {
+		t.Error("chan closed!!")
+	}
+	t.Logf("收到消息: %+v\n", msg)
+	if nil != msg && msg.Type == MsgTypeFriendConfirm {
+		isSendByFriend := msg.AcceptNewFriend()
+		t.Logf("isFriend: %t", isSendByFriend)
+	} else {
+		t.Fatalf("msg is nil")
+	}
+}
+
 func TestClient_GetMemberByCache(t *testing.T) {
 	// 创建客户端实例
 	client := NewClient(10, false, false)

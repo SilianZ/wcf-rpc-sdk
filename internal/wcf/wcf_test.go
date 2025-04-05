@@ -317,8 +317,9 @@ func TestClient_AcceptFriend(t *testing.T) {
 
 	// 这些值需要根据实际的好友请求消息来填写
 	v3 := "v3_020b3826fd0301000000000049781a096f1ed4000000501ea9a3dba12f95f6b60a0536a1adb60fbd06afd0a1b0587bc4a43c37cf1bfeec110f30c755650c5493fbc713ce869828f7645b3a1600f18d507e13170bac48665cd047f69348941a1c819c6b@stranger"                                                                                                             // 请替换为实际的 v3 值
-	v4 := "v4_000b708f0b04000001000000000057f883922de57cd70175217187671000000050ded0b020927e3c97896a09d47e6e9e550a019a56af47b5593b6812f6d50bc071a677c39ff103d9c04656371318849ecaa951b561b37cd20b073b0340f14bbfb0df83dfb565a29ee993d2bca44ae89aadd1bb17a3d6d96f496025e66b7c019b747dbd069744b68ec3386563add41ff12af5dded467e88920d@stranger" // 请替换为实际的 v4 值
-	scene := int32(30)                                                                                                                                                                                                                                                                                                                     // 请根据实际情况修改
+	v4 := "v4_000b708f0b04000001000000000056070952891bb4feefe92f30f1671000000050ded0b020927e3c97896a09d47e6e9e6c2c31a942365845a112db65ab7a74c2d033765364e648c75ad6dbd6d2b57d2981cbb25c25e06be510601429d0cecd92d48701cc071c8b0dc6888059e7f3343cc36b2aac3693f8f668fb523f2ddab5701d57d68682306952e2ba839695cb6264a6f08dc471f7fbedec@stranger" // 请替换为实际的 v4 值
+	//scene := int32(30)                                                                                                                                                                                                                                                                                                                     // 请根据实际情况修改
+	scene := int64(2421814416) // 请根据实际情况修改
 
 	status := c.AcceptFriend(v3, v4, scene)
 	if status != 1 {

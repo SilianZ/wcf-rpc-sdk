@@ -24,6 +24,7 @@ type IMeta interface {
 	ReplyImage(src string) error
 	ReplyFile(src string) error
 	IsSendByFriend() bool
+	AcceptNewFriend(req NewFriendReq) bool
 }
 
 // 用于回调
@@ -49,6 +50,11 @@ func (m *meta) ReplyFile(src string) error {
 	return m.cli.SendFile(m.sender, src)
 }
 
+// AcceptNewFriend 通过好友请求
+func (m *meta) AcceptNewFriend(req NewFriendReq) bool {
+	return m.cli.AcceptNewFriend(req)
+}
+
 // IsSendByFriend 是否好友发送的消息
 func (m *meta) IsSendByFriend() bool {
 	if m.rawMsg.IsSelf {
@@ -58,27 +64,35 @@ func (m *meta) IsSendByFriend() bool {
 }
 
 type Message struct {
-	meta      IMeta       // 用于实现对客户端操作
-	IsSelf    bool        `json:"is_self,omitempty"`
-	IsGroup   bool        `json:"is_group,omitempty"`
-	IsGH      bool        `json:"is_gh,omitempty"` // 是否公众号
-	MessageId uint64      `json:"message_id,omitempty"`
-	Type      MsgType     `json:"type,omitempty"`
-	Ts        uint32      `json:"ts,omitempty"`
-	RoomId    string      `json:"room_id,omitempty"`
-	RoomData  *RoomData   `json:"room_data,omitempty"`
-	Content   string      `json:"content,omitempty"`
-	WxId      string      `json:"wx_id,omitempty"`
-	Sign      string      `json:"sign,omitempty"`
-	Thumb     string      `json:"thumb,omitempty"`
-	Extra     string      `json:"extra,omitempty"`
-	Xml       string      `json:"xml,omitempty"`
-	FileInfo  *FileInfo   `json:"file_info,omitempty"` // 图片保存信息
-	Quote     *QuoteMsg   `json:"quote,omitempty"`     // 引用消息
-	Forward   *ForwardMsg `json:"forward,omitempty"`   // 转发消息
+	meta         IMeta         // 用于实现对客户端操作
+	IsSelf       bool          `json:"is_self,omitempty"`
+	IsGroup      bool          `json:"is_group,omitempty"`
+	IsGH         bool          `json:"is_gh,omitempty"` // 是否公众号
+	MessageId    uint64        `json:"message_id,omitempty"`
+	Type         MsgType       `json:"type,omitempty"`
+	Ts           uint32        `json:"ts,omitempty"`
+	RoomId       string        `json:"room_id,omitempty"`
+	RoomData     *RoomData     `json:"room_data,omitempty"`
+	Content      string        `json:"content,omitempty"`
+	WxId         string        `json:"wx_id,omitempty"`
+	Sign         string        `json:"sign,omitempty"`
+	Thumb        string        `json:"thumb,omitempty"`
+	Extra        string        `json:"extra,omitempty"`
+	Xml          string        `json:"xml,omitempty"`
+	FileInfo     *FileInfo     `json:"file_info,omitempty"`      // 图片保存信息
+	Quote        *QuoteMsg     `json:"quote,omitempty"`          // 引用消息
+	Forward      *ForwardMsg   `json:"forward,omitempty"`        // 转发消息
+	NewFriendReq *NewFriendReq `json:"new_friend_req,omitempty"` // 新好友请求
 
 	//UserInfo *UserInfo `json:"user_info,omitempty"` todo
 	//Contacts *Contacts `json:"contact,omitempty"`
+}
+
+// NewFriendReq 好友添加请求
+type NewFriendReq struct {
+	V3    string
+	V4    string
+	Scene int64
 }
 
 type FileInfo struct {
@@ -139,6 +153,14 @@ func (m *Message) ReplyFile(src string) error {
 // IsSendByFriend 是否为好友的消息
 func (m *Message) IsSendByFriend() bool {
 	return m.meta.IsSendByFriend()
+}
+
+// AcceptNewFriend 通过好友请求
+func (m *Message) AcceptNewFriend() bool {
+	if m.NewFriendReq == nil {
+		return false
+	}
+	return m.meta.AcceptNewFriend(*m.NewFriendReq)
 }
 
 type MessageBuffer struct {

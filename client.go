@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Clov614/logging"
-	roomdata "github.com/Clov614/wcf-rpc-sdk/internal/proto"
 	"github.com/Clov614/wcf-rpc-sdk/internal/utils/imgutil"
 	"github.com/Clov614/wcf-rpc-sdk/internal/wcf"
 	"github.com/antchfx/xmlquery"
@@ -256,6 +255,11 @@ func (c *Client) SendCardMessage(receiver string, card CardMessage) error {
 	return nil
 }
 
+// AcceptNewFriend 通过好友请求
+func (c *Client) AcceptNewFriend(req NewFriendReq) bool {
+	return 1 == c.wxClient.AcceptFriend(req.V3, req.V4, req.Scene) // 1 为成功
+}
+
 // RoomMembers 获取群成员信息
 func (c *Client) RoomMembers(roomId string) ([]*ContactInfo, error) {
 	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")
@@ -267,7 +271,7 @@ func (c *Client) RoomMembers(roomId string) ([]*ContactInfo, error) {
 
 	roomDataBytes := contacts[0].GetFields()[0].Content
 
-	roomData := &roomdata.RoomData{}
+	roomData := &wcf.RoomData{}
 
 	err := proto.Unmarshal(roomDataBytes, roomData)
 	if err != nil {
@@ -568,6 +572,11 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 		Extra:     msg.Extra,
 		Xml:       msg.Xml,
 	}
+	// 好友申请解析
+	if m.Type == MsgTypeFriendConfirm {
+		fillNewFriendReq(m)
+	}
+
 	// 图片数据解析
 	if m.Type == MsgTypeImage {
 		time.Sleep(50 * time.Microsecond)
@@ -621,6 +630,48 @@ func (c *Client) covertMsg(msg *wcf.WxMsg) *Message {
 	}
 	m.meta = metaData
 	return m
+}
+
+func fillNewFriendReq(m *Message) {
+	if m.Content != "" { // 确保 Content 不为空
+		doc, err := xmlquery.Parse(strings.NewReader(m.Content))
+		if err != nil {
+			logging.ErrorWithErr(err, "Failed to parse friend request XML", map[string]interface{}{"messageId": m.MessageId, "content": m.Content})
+		} else {
+			msgNode := xmlquery.FindOne(doc, "/msg") // 查找根节点 <msg>
+			if msgNode != nil {
+				v3 := msgNode.SelectAttr("encryptusername") // 提取 v3 (encryptusername)
+				v4 := msgNode.SelectAttr("ticket")          // 提取 v4 (ticket)
+				sceneStr := msgNode.SelectAttr("scene")     // 提取 scene 字符串
+
+				var sceneVal int64
+				if sceneStr != "" {
+					sceneVal, err = strconv.ParseInt(sceneStr, 10, 64) // 解析 scene 为 int
+					if err != nil {
+						logging.ErrorWithErr(err, "Failed to parse scene attribute in friend request", map[string]interface{}{"messageId": m.MessageId, "sceneStr": sceneStr})
+						// 解析失败，可以设置默认值或保持为0
+						sceneVal = 0
+					}
+				} else {
+					// scene 属性可能不存在或为空
+					logging.Warn("Scene attribute missing or empty in friend request", map[string]interface{}{"messageId": m.MessageId})
+					sceneVal = 0 // 默认值
+				}
+
+				// 创建并填充 NewFriendReq 结构体
+				m.NewFriendReq = &NewFriendReq{
+					V3:    v3,
+					V4:    v4,
+					Scene: sceneVal, // 转换为 int32
+				}
+				logging.Debug("Parsed friend request", map[string]interface{}{"v3": v3, "v4_len": len(v4), "scene": m.NewFriendReq.Scene}) // 打印 V4 长度避免日志过长
+			} else {
+				logging.Error("Could not find <msg> node in friend request XML", map[string]interface{}{"messageId": m.MessageId, "content": m.Content})
+			}
+		}
+	} else {
+		logging.Warn("Friend request message content is empty", map[string]interface{}{"messageId": m.MessageId})
+	}
 }
 
 func parseReferMsg(xmlStr string) (*ReferMsg, string, error) {

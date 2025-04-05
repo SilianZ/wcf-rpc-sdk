@@ -1,7 +1,7 @@
 syntax = "proto3";
 package roomdata;
 
-option go_package = "github.com/Clov614/wcf-rpc-sdk/internal/proto/roomdata";
+option go_package = "../wcf";
 
 message RoomData {
 
