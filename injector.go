@@ -72,7 +72,7 @@ func waitingSignal(ctx context.Context) {
 }
 
 func Inject(ctx context.Context, cancel context.CancelFunc, port int, debug bool, syncChan chan struct{}) {
-	logging.Warn("自动注入中...", map[string]interface{}{"hint": "请检查是否安装对应微信3.9.11.25版本，如未安装请前往地址下载&安装", "wechatSetUpUrl": "https://github.com/lich0821/WeChatFerry/releases/download/v39.3.5/WeChatSetup-3.9.11.25.exe"})
+	logging.Warn("自动注入中...", map[string]interface{}{"hint": "请检查是否安装对应微信3.9.12.17版本，如未安装请前往地址下载&安装", "wechatSetUpUrl": "https://github.com/lich0821/WeChatFerry/releases/download/v39.4.3/WeChatSetup-3.9.12.17.exe"})
 	logging.Info("debug 模式状态", map[string]interface{}{"debug": debug})
 	// 加载调用库
 	log("Load dll:", libSdk)
@@ -127,7 +127,7 @@ func tryInject(debug bool, port int) (success bool) {
 func downloadAndRetry() bool {
 	dlls := []string{"sdk.dll", "spy.dll", "spy_debug.dll"}
 	// 使用 raw.githubusercontent.com 的地址
-	baseUrl := "https://raw.githubusercontent.com/Clov614/wcf-rpc-sdk/main/sources/sdk/3.11.25"
+	baseUrl := "https://raw.githubusercontent.com/Clov614/wcf-rpc-sdk/main/sources/sdk/3.12.17"
 
 	for _, dll := range dlls {
 		url := baseUrl + dll
