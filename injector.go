@@ -127,7 +127,7 @@ func tryInject(debug bool, port int) (success bool) {
 func downloadAndRetry() bool {
 	dlls := []string{"sdk.dll", "spy.dll", "spy_debug.dll"}
 	// 使用 raw.githubusercontent.com 的地址
-	baseUrl := "https://raw.githubusercontent.com/Clov614/wcf-rpc-sdk/main/sources/sdk/"
+	baseUrl := "https://raw.githubusercontent.com/Clov614/wcf-rpc-sdk/main/sources/sdk/3.11.25"
 
 	for _, dll := range dlls {
 		url := baseUrl + dll
