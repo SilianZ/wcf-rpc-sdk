@@ -237,12 +237,12 @@ func (c *Client) SendFile(receiver string, src string) error {
 
 // CardMessage 卡片消息结构体
 type CardMessage struct {
-	Name     string // 卡片名称
-	Account  string // 账号
-	Title    string // 标题
-	Digest   string // 摘要
-	URL      string // 链接
-	ThumbURL string // 缩略图链接
+	Name     string `json:"name"`      // 卡片名称
+	Account  string `json:"account"`   // 账号
+	Title    string `json:"title"`     // 标题
+	Digest   string `json:"digest"`    // 摘要
+	URL      string `json:"url"`       // 链接
+	ThumbURL string `json:"thumb_url"` // 缩略图链接
 }
 
 // SendCardMessage 发送卡片消息
