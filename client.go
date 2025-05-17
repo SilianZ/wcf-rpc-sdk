@@ -225,6 +225,44 @@ func (c *Client) SendImage(receiver string, src string) error {
 	return nil
 }
 
+// SendImageBytes 发送图片字节数据 <wxid or roomid> <图片字节>
+func (c *Client) SendImageBytes(receiver string, imgBytes []byte) error {
+	// 创建临时文件
+	tmpFile, err := imgutil.CreateTempFile(".jpg") // 假设图片格式为 jpg，如果需要支持其他格式，可以调整
+	if err != nil {
+		logging.ErrorWithErr(err, "imgutil.CreateTempFile for SendImageBytes")
+		return err
+	}
+	defer func() {
+		// 关闭文件
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			logging.ErrorWithErr(closeErr, "tmpFile.Close error in SendImageBytes defer")
+		}
+		// 删除临时文件
+		if removeErr := imgutil.RemoveTempFile(tmpFile.Name()); removeErr != nil {
+			logging.ErrorWithErr(removeErr, "imgutil.RemoveTempFile error in SendImageBytes defer")
+		}
+	}()
+
+	// 写入临时文件
+	_, err = tmpFile.Write(imgBytes)
+	if err != nil {
+		logging.ErrorWithErr(err, "tmpFile.Write for SendImageBytes")
+		return err
+	}
+
+	// 获取临时文件路径
+	src := tmpFile.Name()
+
+	// 发送图片
+	res := c.wxClient.SendIMG(src, receiver)
+	if res != 0 {
+		logging.Debug("wxCliend.SendIMG from SendImageBytes", map[string]interface{}{"res": res, "receiver": receiver, "src_len": len(imgBytes)}) // 打印字节长度方便debug
+		return fmt.Errorf("wxClient.SendIMG from SendImageBytes err, code: %d", res)
+	}
+	return nil
+}
+
 // SendFile 发送图片 <wxid or roomid> <文件绝对路径> todo 支持网络地址发送文件
 func (c *Client) SendFile(receiver string, src string) error {
 	res := c.wxClient.SendFile(src, receiver)
