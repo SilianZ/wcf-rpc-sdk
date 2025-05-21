@@ -298,6 +298,33 @@ func (c *Client) AcceptNewFriend(req NewFriendReq) bool {
 	return 1 == c.wxClient.AcceptFriend(req.V3, req.V4, req.Scene) // 1 为成功
 }
 
+// CtFriends 获取通讯录所有好友
+func (c *Client) CtFriends() ([]Friend, error) {
+	fs, b := c.self.CtFriends()
+	if !b {
+		return nil, fmt.Errorf("self.CtFriends err")
+	}
+	return fs, nil
+}
+
+// CtChatRooms 获取通讯录所有群聊
+func (c *Client) CtChatRooms() ([]ChatRoom, error) {
+	cr, b := c.self.ChatRooms()
+	if !b {
+		return nil, fmt.Errorf("self.ChatRooms err")
+	}
+	return cr, nil
+}
+
+// CtGHs 获取通讯录所有公众号
+func (c *Client) CtGHs() ([]GH, error) {
+	ghs, b := c.self.CtGHs()
+	if !b {
+		return nil, fmt.Errorf("self.CtGHs err")
+	}
+	return ghs, nil
+}
+
 // RoomMembers 获取群成员信息
 func (c *Client) RoomMembers(roomId string) ([]*ContactInfo, error) {
 	contacts := c.wxClient.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomId+"';")

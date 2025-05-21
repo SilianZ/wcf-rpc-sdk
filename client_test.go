@@ -120,6 +120,57 @@ func TestClient_GetRoomMembers(t *testing.T) {
 	t.Logf("Decoded string for roomId %s: %v", roomId, roomMembers)
 }
 
+func TestClient_CtFriends(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	client.Run(true)
+	defer client.Close()
+
+	friends, err := client.CtFriends()
+	if err != nil {
+		t.Fatalf("GetFriends failed: %v", err)
+	}
+	if len(friends) != 0 {
+		t.Logf("success! friends: %v", friends)
+	}
+}
+
+func TestClient_CtChatRooms(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	client.Run(true)
+	defer client.Close()
+
+	crs, err := client.CtChatRooms()
+	if err != nil {
+		t.Fatalf("GetChatRooms failed: %v", err)
+	}
+	if len(crs) != 0 {
+		t.Logf("success! ChatRooms: %v", crs)
+	}
+}
+
+func TestClient_CtGHs(t *testing.T) {
+	// 创建客户端实例
+	client := NewClient(10, false, false)
+
+	// 启动客户端
+	client.Run(true)
+	defer client.Close()
+
+	ghs, err := client.CtGHs()
+	if err != nil {
+		t.Fatalf("GetGHs failed: %v", err)
+	}
+	if len(ghs) != 0 {
+		t.Logf("success! GHs: %v", ghs)
+	}
+}
+
 func TestClient_QueryRoomTable(t *testing.T) {
 	c := NewClient(10, false, false)
 	defer c.Close()

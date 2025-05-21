@@ -160,24 +160,100 @@ func (s *Self) UpdateContact() (success bool) {
 	defer s.mu.Unlock()
 	contacts := s.cli.GetContacts()
 	for _, ct := range contacts {
-		u := User{
-			Wxid:     ct.Wxid,
-			Code:     ct.Code,
-			Remark:   ct.Remark,
-			Name:     ct.Name,
-			Country:  ct.Country,
-			Province: ct.Province,
-			City:     ct.City,
-			Gender:   GenderType(ct.Gender),
-		}
+		u := ct2user(ct)
 		switch true {
-		case strings.HasPrefix(ct.Wxid, "wxid_"):
+		case isFriendType(ct.Wxid):
 			s.Friends[u.Wxid] = Friend(u)
-		case strings.HasSuffix(ct.Wxid, "@chatroom"):
+		case isChatRoomType(ct.Wxid):
 			s.Rooms[u.Wxid] = ChatRoom{User: u}
-		case strings.HasPrefix(ct.Wxid, "gh_"):
+		case isGHType(ct.Wxid):
 			s.GHs[u.Wxid] = GH(u)
 		}
 	}
 	return true
+}
+
+// ChatRooms 获取通讯录所有群聊
+func (s *Self) ChatRooms() ([]ChatRoom, bool) {
+	// 不走缓存
+	s.mu.Lock()
+	contacts := s.cli.GetContacts()
+	s.mu.Unlock()
+	var chatRooms = make([]ChatRoom, 0, len(contacts))
+	for _, ct := range contacts {
+		if isChatRoomType(ct.Wxid) {
+			u := ct2user(ct)
+			chatRooms = append(chatRooms, ChatRoom{User: u, RoomID: u.Wxid})
+		}
+	}
+	return chatRooms, true
+}
+
+// CtFriends 获取通讯录所有好友
+func (s *Self) CtFriends() ([]Friend, bool) {
+	//if !s.mu.TryLock() { // 不走缓存
+	//	return nil, false
+	//}
+	s.mu.Lock()
+	contacts := s.cli.GetContacts()
+	s.mu.Unlock()
+	var friends = make([]Friend, 0, len(contacts))
+	for _, ct := range contacts {
+		if isFriendType(ct.Wxid) {
+			u := ct2user(ct)
+			friends = append(friends, Friend(u))
+		}
+	}
+	return friends, true
+}
+
+// CtGHs 获取通讯录所有公众号
+func (s *Self) CtGHs() ([]GH, bool) {
+	// 不走缓存
+	s.mu.Lock()
+	contacts := s.cli.GetContacts()
+	s.mu.Unlock()
+	var ghs = make([]GH, 0, len(contacts))
+	for _, ct := range contacts {
+		if isGHType(ct.Wxid) {
+			u := ct2user(ct)
+			ghs = append(ghs, GH(u))
+		}
+	}
+	return ghs, true
+}
+
+func ct2user(ct *wcf.RpcContact) User {
+	u := User{
+		Wxid:     ct.Wxid,
+		Code:     ct.Code,
+		Remark:   ct.Remark,
+		Name:     ct.Name,
+		Country:  ct.Country,
+		Province: ct.Province,
+		City:     ct.City,
+		Gender:   GenderType(ct.Gender),
+	}
+	return u
+}
+
+func isFriendType(wxid string) bool {
+	if strings.HasPrefix(wxid, "wxid_") {
+		return true
+	}
+	return false
+}
+
+func isChatRoomType(wxid string) bool {
+	if strings.HasSuffix(wxid, "@chatroom") {
+		return true
+	}
+	return false
+}
+
+func isGHType(wxid string) bool {
+	if strings.HasPrefix(wxid, "gh_") {
+		return true
+	}
+	return false
 }
