@@ -4,6 +4,43 @@
 
 一个简单的 Go 语言 SDK，用于与 [WCF (WeChat Ferry)](https://github.com/lich0821/WeChatFerry) RPC 服务进行交互。
 
+## Python 版本
+
+本仓库同时提供 Python 实现，位于 `python/wcf_rpc_sdk` 目录。该实现与 Go 版本保持相同的 RPC 接口，并提供熟悉
+的消息缓冲与联系人缓存体验。
+
+### 安装
+
+```bash
+pip install pynng pytest  # 运行示例或测试前需要的依赖
+pip install -e ./python   # 可选：以开发模式安装
+```
+
+### 快速开始
+
+```python
+from wcf_rpc_sdk import Client
+
+
+client = Client(msg_buffer_size=10)
+client.run()
+
+if not client.is_login():
+    print("请先在电脑端登录微信")
+
+friends = client.get_all_friend()
+print("好友数量", len(friends))
+
+client.send_text("filehelper", "你好，这是一条来自 Python SDK 的消息")
+
+message = client.get_message(timeout=5)
+print("收到消息:", message.content)
+
+client.close()
+```
+
+> **提示**：Python 版本需要本地已经启动的 WCF RPC 服务。若系统中未安装 `pynng`，SDK 会在运行时给出明确的依赖提示。
+
 ## 特别鸣谢
 
 - 感谢[lich0821](https://github.com/lich0821)大佬的[WeChatFerry](https://github.com/lich0821/WeChatFerry)项目
